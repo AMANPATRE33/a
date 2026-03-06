@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Smart Anna - Intelligent Cafeteria</title>
+    
+    <!-- Default Robot Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    
+    <!-- Tailwind CSS (CDN kept for simplicity in this specific setup, though postcss is available) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'shake': 'shake 0.82s cubic-bezier(.36,.07,.19,.97) both',
+              'bounce-in': 'bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both',
+            },
+            keyframes: {
+              shake: {
+                '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+              },
+              bounceIn: {
+                '0%': { opacity: '0', transform: 'scale(0.8) translateY(20px)' },
+                '100%': { opacity: '1', transform: 'scale(1) translateY(0)' }
+              }
+            },
+            screens: {
+              'xs': '475px', // Added extra small breakpoint for better mobile control
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #0f172a;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #334155;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+      /* Hide scrollbar for chrome/safari/opera */
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .scrollbar-hide {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+
+      /* --- FUN CLOCK UI (Renamed to .clock-card) --- */
+      /* From Uiverse.io by akshat-patel28 */ 
+      .clock-card {
+        width: 280px;
+        height: 150px;
+        background: rgb(17, 4, 134);
+        border-radius: 15px;
+        box-shadow: rgb(0,0,0,0.7) 5px 10px 50px ,rgb(0,0,0,0.7) -5px 0px 250px;
+        display: flex;
+        color: white;
+        justify-content: center;
+        position: relative;
+        flex-direction: column;
+        background: linear-gradient(to right, rgb(20, 30, 48), rgb(36, 59, 85));
+        cursor: pointer;
+        transition: all 0.3s ease-in-out;
+        overflow: hidden;
+      }
+
+      .clock-card:hover {
+        box-shadow: rgb(0,0,0) 5px 10px 50px ,rgb(0,0,0) -5px 0px 250px;
+      }
+
+      .time-text {
+        font-size: 50px;
+        margin-top: 0px;
+        margin-left: 15px;
+        font-weight: 600;
+        font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+        line-height: 1;
+      }
+
+      .time-sub-text {
+        font-size: 15px;
+        margin-left: 5px;
+      }
+
+      .day-text {
+        font-size: 18px;
+        margin-top: 5px;
+        margin-left: 15px;
+        font-weight: 500;
+        font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      }
+
+      .moon {
+        font-size: 20px;
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        transition: all 0.3s ease-in-out;
+      }
+
+      .clock-card:hover > .moon {
+        font-size: 23px;
+        transform: scale(1.1);
+      }
+
+      /* --- AUTH CARD UI (Adapted from Uiverse.io by Tiagoadag) --- */
+      .auth-card-outer {
+        /* Dimensions handled by Tailwind classes */
+        background-image: linear-gradient(163deg, #00ff75 0%, #3700ff 100%);
+        border-radius: 2.5rem; /* Matches app theme */
+        transition: all .3s;
+        padding: 4px; /* Border thickness */
+      }
+
+      .auth-card-inner {
+        width: 100%;
+        height: 100%;
+        /* Background color handled by Tailwind for Dark Mode support */
+        border-radius: 2.3rem; /* Slightly smaller than outer */
+        transition: all .2s;
+      }
+
+      .auth-card-inner:hover {
+        transform: scale(0.99); /* Subtle scale effect */
+      }
+
+      .auth-card-outer:hover {
+        box-shadow: 0px 0px 30px 1px rgba(0, 255, 117, 0.30);
+      }
+
+      /* --- DAY/NIGHT TOGGLE (From Uiverse.io by RiccardoRapelli) --- */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+        flex-shrink: 0; /* Prevents shrinking in flex containers */
+      }
+
+      .switch #input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #2196f3;
+        -webkit-transition: 0.4s;
+        transition: 0.4s;
+        z-index: 0;
+        overflow: hidden;
+      }
+
+      .sun-moon {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: yellow;
+        -webkit-transition: 0.4s;
+        transition: 0.4s;
+      }
+
+      #input:checked + .slider {
+        background-color: black;
+      }
+
+      #input:focus + .slider {
+        box-shadow: 0 0 1px #2196f3;
+      }
+
+      #input:checked + .slider .sun-moon {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+        background-color: white;
+        -webkit-animation: rotate-center 0.6s ease-in-out both;
+        animation: rotate-center 0.6s ease-in-out both;
+      }
+
+      .moon-dot {
+        opacity: 0;
+        transition: 0.4s;
+        fill: gray;
+      }
+
+      #input:checked + .slider .sun-moon .moon-dot {
+        opacity: 1;
+      }
+
+      .slider.round {
+        border-radius: 34px;
+      }
+
+      .slider.round .sun-moon {
+        border-radius: 50%;
+      }
+
+      #moon-dot-1 {
+        left: 10px;
+        top: 3px;
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        z-index: 4;
+      }
+
+      #moon-dot-2 {
+        left: 2px;
+        top: 10px;
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        z-index: 4;
+      }
+
+      #moon-dot-3 {
+        left: 16px;
+        top: 18px;
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        z-index: 4;
+      }
+
+      #light-ray-1 {
+        left: -8px;
+        top: -8px;
+        position: absolute;
+        width: 43px;
+        height: 43px;
+        z-index: -1;
+        fill: white;
+        opacity: 10%;
+      }
+
+      #light-ray-2 {
+        left: -50%;
+        top: -50%;
+        position: absolute;
+        width: 55px;
+        height: 55px;
+        z-index: -1;
+        fill: white;
+        opacity: 10%;
+      }
+
+      #light-ray-3 {
+        left: -18px;
+        top: -18px;
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        z-index: -1;
+        fill: white;
+        opacity: 10%;
+      }
+
+      .cloud-light {
+        position: absolute;
+        fill: #eee;
+        animation-name: cloud-move;
+        animation-duration: 6s;
+        animation-iteration-count: infinite;
+      }
+
+      .cloud-dark {
+        position: absolute;
+        fill: #ccc;
+        animation-name: cloud-move;
+        animation-duration: 6s;
+        animation-iteration-count: infinite;
+        animation-delay: 1s;
+      }
+
+      #cloud-1 {
+        left: 30px;
+        top: 15px;
+        width: 40px;
+      }
+
+      #cloud-2 {
+        left: 44px;
+        top: 10px;
+        width: 20px;
+      }
+
+      #cloud-3 {
+        left: 18px;
+        top: 24px;
+        width: 30px;
+      }
+
+      #cloud-4 {
+        left: 36px;
+        top: 18px;
+        width: 40px;
+      }
+
+      #cloud-5 {
+        left: 48px;
+        top: 14px;
+        width: 20px;
+      }
+
+      #cloud-6 {
+        left: 22px;
+        top: 26px;
+        width: 30px;
+      }
+
+      @keyframes cloud-move {
+        0% {
+          transform: translateX(0px);
+        }
+
+        40% {
+          transform: translateX(4px);
+        }
+
+        80% {
+          transform: translateX(-4px);
+        }
+
+        100% {
+          transform: translateX(0px);
+        }
+      }
+
+      .stars {
+        transform: translateY(-32px);
+        opacity: 0;
+        transition: 0.4s;
+      }
+
+      .star {
+        fill: white;
+        position: absolute;
+        -webkit-transition: 0.4s;
+        transition: 0.4s;
+        animation-name: star-twinkle;
+        animation-duration: 2s;
+        animation-iteration-count: infinite;
+      }
+
+      #input:checked + .slider .stars {
+        -webkit-transform: translateY(0);
+        -ms-transform: translateY(0);
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      #star-1 {
+        width: 20px;
+        top: 2px;
+        left: 3px;
+        animation-delay: 0.3s;
+      }
+
+      #star-2 {
+        width: 6px;
+        top: 16px;
+        left: 3px;
+      }
+
+      #star-3 {
+        width: 12px;
+        top: 20px;
+        left: 10px;
+        animation-delay: 0.6s;
+      }
+
+      #star-4 {
+        width: 18px;
+        top: 0px;
+        left: 18px;
+        animation-delay: 1.3s;
+      }
+
+      @keyframes star-twinkle {
+        0% {
+          transform: scale(1);
+        }
+
+        40% {
+          transform: scale(1.2);
+        }
+
+        80% {
+          transform: scale(0.8);
+        }
+
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      /* --- NEW FLIP CARD UI (From Uiverse.io by ElSombrero2) --- */
+      .flip-card {
+        overflow: visible;
+        width: 100%;
+        max-width: 220px;
+        height: 280px;
+        perspective: 1000px;
+        margin: 0 auto;
+      }
+
+      .flip-content {
+        width: 100%;
+        height: 100%;
+        transform-style: preserve-3d;
+        transition: transform 600ms; /* Slowed down slightly for smoother effect */
+        box-shadow: 0px 0px 10px 1px #00000033;
+        border-radius: 1rem;
+      }
+
+      .flip-card:hover .flip-content {
+        transform: rotateY(180deg);
+      }
+
+      .flip-front, .flip-back {
+        background-color: #1e293b; /* Dark Slate to match theme */
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        border-radius: 1rem;
+        overflow: hidden;
+      }
+
+      .flip-front {
+        transform: rotateY(0deg);
+        color: white;
+      }
+
+      .flip-back {
+        transform: rotateY(180deg);
+        width: 100%;
+        height: 100%;
+        justify-content: center;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        background-color: #0f172a; /* Darker Slate */
+      }
+
+      .flip-back::before {
+        position: absolute;
+        content: ' ';
+        display: block;
+        width: 160px;
+        height: 160%;
+        /* Updated Gradient to match Orange Theme */
+        background: linear-gradient(90deg, transparent, #ea580c, #ea580c, #ea580c, #ea580c, transparent);
+        animation: rotation_481 5000ms infinite linear;
+      }
+
+      .flip-back-content {
+        position: absolute;
+        width: 98%;
+        height: 98%;
+        background-color: #1e293b;
+        border-radius: 1rem;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        z-index: 10;
+      }
+
+      @keyframes rotation_481 {
+        0% { transform: rotateZ(0deg); }
+        100% { transform: rotateZ(360deg); }
+      }
+
+      .flip-front .front-content {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        z-index: 5;
+      }
+
+      .front-content .badge {
+        background-color: #00000077;
+        padding: 4px 10px;
+        border-radius: 10px;
+        backdrop-filter: blur(4px);
+        width: fit-content;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .description {
+        box-shadow: 0px 0px 10px 5px #00000055;
+        width: 100%;
+        padding: 12px;
+        background-color: #000000aa;
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+      }
+
+      .title {
+        font-size: 14px;
+        max-width: 100%;
+        display: flex;
+        justify-content: space-between;
+        font-weight: 700;
+      }
+
+      .card-footer {
+        color: #ffffffaa;
+        margin-top: 4px;
+        font-size: 10px;
+        font-weight: 500;
+      }
+
+      .flip-front .img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        z-index: 1;
+      }
+
+      .circle {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background-color: #fb923c;
+        position: relative;
+        filter: blur(15px);
+        animation: floating 2600ms infinite linear;
+      }
+
+      #bottom {
+        background-color: #ea580c;
+        left: 50px;
+        top: 0px;
+        width: 150px;
+        height: 150px;
+        animation-delay: -800ms;
+      }
+
+      #right {
+        background-color: #c2410c;
+        left: 160px;
+        top: -80px;
+        width: 30px;
+        height: 30px;
+        animation-delay: -1800ms;
+      }
+
+      @keyframes floating {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(10px); }
+        100% { transform: translateY(0px); }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 antialiased selection:bg-orange-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
