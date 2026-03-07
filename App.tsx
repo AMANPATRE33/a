@@ -47,7 +47,6 @@ import {
   WifiOff,
   Quote,
   DollarSign,
-  Menu as MenuIcon,
   ShoppingBag,
   ChevronRight,
   ChevronUp,
@@ -60,7 +59,9 @@ import {
   ShoppingCart,
   Loader2,
   ShieldCheck,
-  Flame
+  Flame,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   fetchStatus, 
@@ -97,27 +98,16 @@ const CUSTOM_LOGO_URL = "";
 
 // --- Custom Logo Component ---
 const SmartAnnaLogo = ({ className = "" }: { className?: string }) => (
-  <div className={`relative flex items-center justify-center ${className}`}>
-    {CUSTOM_LOGO_URL ? (
-      <div className="relative">
-        <img 
-          src={CUSTOM_LOGO_URL} 
-          alt="Smart Anna Logo" 
-          className="w-12 h-12 rounded-2xl object-cover shadow-lg border-2 border-white dark:border-slate-800"
-        />
-        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></div>
-      </div>
-    ) : (
-      <>
-        <div className="bg-gradient-to-br from-orange-500 to-red-600 p-2.5 rounded-2xl shadow-lg shadow-orange-200 dark:shadow-none text-white relative overflow-hidden">
-          <Bot size={32} />
-          <div className="absolute top-0 right-0 p-0.5 bg-white dark:bg-slate-900 rounded-bl-lg">
-            <ChefHat size={12} className="text-orange-600" />
-          </div>
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></div>
-      </>
-    )}
+  <div className={`relative flex items-center justify-center overflow-hidden rounded-[2rem] bg-white dark:bg-slate-800 shadow-2xl border-4 border-white dark:border-slate-800 ${className}`} style={{ width: '120px', height: '120px' }}>
+    <img 
+      src="/app_logo.jpg" 
+      alt="Smart Anna Logo" 
+      className="w-full h-full object-cover object-center transform scale-110 hover:scale-125 transition-transform duration-700"
+      onError={(e) => {
+        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200";
+      }}
+    />
+    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-4 border-white dark:border-slate-900 animate-pulse"></div>
   </div>
 );
 
@@ -401,6 +391,7 @@ const App: React.FC = () => {
   // --- Recommendation State ---
   const [recommendation, setRecommendation] = useState<MenuItem | null>(null);
   const [showRecommendation, setShowRecommendation] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // NEW: Password visibility toggle
 
   // --- Theme Effect ---
   useEffect(() => {
@@ -445,13 +436,12 @@ const App: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  // --- Register Global Error Handler ---
-  useEffect(() => {
-    registerGlobalErrorCallback(showNotification);
-    return () => registerGlobalErrorCallback(() => console.warn("Error handler unmounted"));
-  }, [showNotification]);
-
   // --- Data Fetching ---
+  const refreshMenu = useCallback(async () => {
+    const items = await fetchMenu();
+    setMenu(items);
+  }, []);
+
   const updateDashboard = useCallback(async () => {
     if (!user || appLoading) return;
     try {
@@ -466,24 +456,10 @@ const App: React.FC = () => {
     }
   }, [user, appLoading]);
 
-  const refreshMenu = useCallback(async () => {
-    if(!user) return;
-    const items = await fetchMenu();
-    setMenu(items);
-  }, [user]);
-
   const loadReviews = useCallback(async () => {
     const data = await fetchReviews();
     setReviews(data);
   }, []);
-
-  useEffect(() => {
-    if (user && !appLoading) {
-       updateDashboard();
-       const interval = setInterval(updateDashboard, POLL_INTERVAL);
-       return () => clearInterval(interval);
-    }
-  }, [updateDashboard, user, appLoading]);
 
   const loadCameras = useCallback(async () => {
      if(user) {
@@ -500,6 +476,22 @@ const App: React.FC = () => {
         }
      }
   }, [user]);
+
+  // --- Register Global Error Handler & Initial Load ---
+  useEffect(() => {
+    registerGlobalErrorCallback(showNotification);
+    refreshMenu(); // Initial load
+    return () => registerGlobalErrorCallback(() => console.warn("Error handler unmounted"));
+  }, [showNotification, refreshMenu]);
+  useEffect(() => {
+    if (user && !appLoading) {
+       updateDashboard();
+       const interval = setInterval(updateDashboard, POLL_INTERVAL);
+       return () => clearInterval(interval);
+    }
+  }, [updateDashboard, user, appLoading]);
+
+
 
   useEffect(() => {
     if (activeTab === 'visuals') loadCameras();
@@ -561,6 +553,7 @@ const App: React.FC = () => {
       setLoginEmail('');
       setLoginPass('');
       setActiveTab('dashboard');
+      refreshMenu(); // Pre-fetch menu for all roles
     } else {
       setLoginError("Authentication Failed: Invalid username or password.");
     }
@@ -641,8 +634,9 @@ const App: React.FC = () => {
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const feedbackPayload = {
-      user_email: user?.email,
-      type: feedbackForm.type,
+      user_name: user?.name || "Anonymous",
+      user_email: user?.email || "anonymous@upl",
+      type: feedbackForm.type as any,
       rating: feedbackForm.rating,
       message: feedbackForm.message,
     };
@@ -707,7 +701,11 @@ const App: React.FC = () => {
         paymentMethod: method
       };
 
-      const dbSaved = await createOrder(newOrder);
+      const dbSaved = await createOrder({
+        ...newOrder,
+        user_name: user.name,
+        user_email: user.email
+      });
 
       if (dbSaved) {
         setShowReceipt(newOrder);
@@ -715,6 +713,7 @@ const App: React.FC = () => {
         setIsMobileCartOpen(false);
         showNotification("Order placed successfully!");
       } else {
+         // Even if DB fails, show receipt (offline fallback)
          setShowReceipt(newOrder);
          setCart([]);
          setIsMobileCartOpen(false);
@@ -821,12 +820,15 @@ const App: React.FC = () => {
 
               <div className="auth-card-outer max-w-md w-full relative z-10">
                 <div className="auth-card-inner bg-white dark:bg-slate-900 p-8 md:p-12">
-                  <div className="flex flex-col items-center mb-8">
-                    <SmartAnnaLogo className="mb-6 scale-125" />
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white text-center tracking-tight">Smart Anna</h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium text-center mt-2 flex items-center gap-2">
-                      <Zap size={14} className="text-orange-500" />
-                      Intelligent Cafeteria System
+                  <div className="flex flex-col items-center mb-10">
+                    <div className="relative mb-8">
+                      <div className="absolute inset-0 bg-orange-400 blur-3xl opacity-30 animate-pulse"></div>
+                      <SmartAnnaLogo className="relative z-10" />
+                    </div>
+                    <h1 className="text-5xl font-black text-slate-900 dark:text-white text-center tracking-tighter">Smart Anna</h1>
+                    <p className="text-sm font-black text-orange-600 dark:text-orange-400 uppercase tracking-[0.4em] mt-4">Intelligence at your service</p>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium text-center mt-4 text-base italic">
+                      "Swift. Smart. Satisfying."
                     </p>
                   </div>
 
@@ -885,17 +887,24 @@ const App: React.FC = () => {
 
                     {loginMode === 'ADMIN' && (
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-2 mb-1 block">Password</label>
+                        <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-2 mb-1 block">Secret Access Key</label>
                         <div className="relative group">
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={20} />
                           <input 
-                            type="password" 
+                            type={showPassword ? "text" : "password"} 
                             required
                             value={loginPass}
                             onChange={e => { setLoginPass(e.target.value); setLoginError(null); }}
                             className={`w-full bg-slate-50 dark:bg-slate-800/50 border-2 rounded-2xl px-12 py-4 font-bold text-slate-800 dark:text-slate-200 focus:outline-none transition-all duration-300 ${loginError ? 'border-red-400 dark:border-red-500 focus:border-red-600' : 'border-slate-400 dark:border-slate-500 hover:border-slate-500 dark:hover:border-slate-400 focus:border-orange-500 focus:bg-white dark:focus:bg-slate-800'}`}
                             placeholder="••••••••"
                           />
+                          <button 
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors"
+                          >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -914,8 +923,11 @@ const App: React.FC = () => {
                   </form>
                   
                   <div className="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest">
-                      {loginMode === 'ADMIN' ? 'Default: admin / admin123' : 'Must use domain @upl'}
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-loose">
+                      {loginMode === 'ADMIN' ? 'Secure Admin Entrance' : 'Authenticated Access Only'}
+                    </p>
+                    <p className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase mt-4 tracking-widest">
+                       © 2024 • Rights Reserved to UPL University
                     </p>
                   </div>
                 </div>
@@ -971,7 +983,7 @@ const App: React.FC = () => {
                               ))}
                            </div>
                         ) : (
-                           <div className="max-h-[350px] md:max-h-none overflow-y-auto custom-scrollbar pr-2 md:pr-0">
+                           <div className="md:max-h-none overflow-y-auto custom-scrollbar pr-2 md:pr-0">
                              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-2 md:gap-3">
                                 {Array.from({ length: TOTAL_TABLES }).map((_, i) => {
                                    const capacity = TABLE_CAPACITY;
@@ -1171,6 +1183,18 @@ const App: React.FC = () => {
                            </div>
                         </header>
 
+                        {/* DEBUG INFO FOR USER */}
+                        {menu.length === 0 && (
+                          <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+                             <p className="text-slate-500 dark:text-slate-400 font-bold">
+                               Menu State: {menu.length} items loaded from DB.
+                             </p>
+                             <p className="text-xs text-slate-400 mt-2">
+                                If you have data in Supabase, please check your RLS policies or console logs (F12).
+                             </p>
+                          </div>
+                        )}
+
                         {/* NEW 3D FLIP CARD GRID - UPDATED RESPONSIVENESS AND PERSISTENT ADD BUTTON */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12 md:gap-x-8 md:gap-y-14 justify-items-center pb-8">
                            {filteredMenu.map(item => (
@@ -1261,10 +1285,18 @@ const App: React.FC = () => {
             {/* ... (Visuals, Feedback, Admin, Mobile Nav, Modals kept same) ... */}
             {activeTab === 'visuals' && (
               <div className="max-w-7xl mx-auto space-y-6">
-                 <header className="flex justify-between items-end">
-                    <div><h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Live Feeds</h2><p className="text-xs md:text-sm text-slate-500">Real-time CCTV coverage.</p></div>
-                    <button onClick={loadCameras} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500"><RefreshCw size={20} className={camerasLoading ? 'animate-spin' : ''} /></button>
-                 </header>
+                  <header className="flex justify-between items-end">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Live Feeds</h2>
+                        <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-black px-3 py-1 rounded-full border border-orange-200 dark:border-orange-800 animate-pulse">UNDER DEVELOPMENT</span>
+                      </div>
+                      <p className="text-xs md:text-sm text-slate-500">Real-time CCTV coverage powered by AI.</p>
+                    </div>
+                    <button onClick={loadCameras} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500">
+                      <RefreshCw size={20} className={camerasLoading ? 'animate-spin' : ''} />
+                    </button>
+                  </header>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     {camerasLoading ? Array.from({length: 4}).map((_, i) => <div key={i} className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse"></div>) : cameraFeeds.map((feed) => (
                        <div key={feed.id} className="relative rounded-3xl overflow-hidden aspect-video bg-black group">
@@ -1534,11 +1566,13 @@ const App: React.FC = () => {
               <MobileNavItem icon={LayoutDashboard} label="Home" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <MobileNavItem icon={CreditCard} label="Order" active={activeTab === 'ordering'} onClick={() => setActiveTab('ordering')} />
               <MobileNavItem icon={Camera} label="Live" active={activeTab === 'visuals'} onClick={() => setActiveTab('visuals')} />
-              {user.role === 'ADMIN' ? (
-                 <MobileNavItem icon={MenuIcon} label="Admin" active={activeTab === 'admin' || activeTab === 'analytics'} onClick={() => setActiveTab('admin')} />
-              ) : (
-                 <MobileNavItem icon={MessageSquare} label="Buzz" active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} />
-              )}
+              <MobileNavItem icon={MessageSquare} label="Buzz" active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} />
+               {user.role === "ADMIN" && (
+                  <>
+                     <MobileNavItem icon={BarChart3} label="Rev" active={activeTab === "analytics"} onClick={() => setActiveTab("analytics")} />
+                     <MobileNavItem icon={Settings} label="Admin" active={activeTab === "admin"} onClick={() => setActiveTab("admin")} />
+                  </>
+               )}
            </nav>
          )}
       </div>
@@ -1765,6 +1799,7 @@ const App: React.FC = () => {
            </div>
         </div>
       )}
+
     </div>
   );
 };

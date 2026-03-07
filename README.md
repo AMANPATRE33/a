@@ -159,3 +159,18 @@ To run the full system locally (Frontend + Backend):
     *   Check your Environment Variables in Vercel. Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are correct.
     *   Check if your Supabase project is active.
 
+---
+
+## 🆕 Latest Updates (March 2024)
+
+We have recently upgraded **Smart Anna** with several "smart" features to make it more reliable and professional:
+
+1.  **🚀 Smart Demo Mode**: If the internet or database goes down, the app won't crash! It now automatically switches to a "Demo Mode" so you can still see how the menu and ordering look.
+2.  **🔒 Better Login Security**: We added a small "Eye" icon to the password entry. Now you can double-check what you're typing before you hit login.
+3.  **🎨 New Iconic Branding**: We’ve updated the app with a bold new character logo, a catchy tagline (*"Swift. Smart. Satisfying."*), and official credits for **UPL University**.
+4.  **🚧 Transparency on Features**: Features like "Live Feeds" are now clearly marked as **UNDER DEVELOPMENT**. This lets users know we are still perfecting the AI vision parts of the system.
+5.  **🍱 Fixed Menu Loading**: We solved a bug where the food menu was showing up blank. It is now perfectly synced with your Supabase cloud database.
+
+---
+© 2024 • All Rights Reserved to UPL University
+

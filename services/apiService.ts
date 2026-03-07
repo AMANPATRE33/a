@@ -9,7 +9,7 @@ import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
  * - Table Sensors
  * - Camera Feeds
  */
-const PYTHON_API_URL = 'http://127.0.0.1:5000'; 
+const PYTHON_API_URL = `http://${window.location.hostname}:5000`;
 
 // --- ERROR HANDLING SYSTEM ---
 type ErrorCallback = (message: string) => void;
@@ -32,7 +32,7 @@ const MOCK_FEEDBACK_STORE: Feedback[] = [
   { id: '1', user_name: 'Rahul K.', user_email: 'rahul@upl', rating: 5, message: 'The Chicken Biryani today was absolutely fire! 🔥', timestamp: Date.now() - 3600000, type: 'Food Quality' },
   { id: '2', user_name: 'Priya S.', user_email: 'priya@upl', rating: 4, message: 'Cold coffee needs less sugar, otherwise perfect.', timestamp: Date.now() - 7200000, type: 'Beverages' },
   { id: '3', user_name: 'Amit D.', user_email: 'amit@upl', rating: 5, message: 'Love the new app interface. Super fast ordering.', timestamp: Date.now() - 10800000, type: 'App Experience' },
-  { id: '4', user_name: 'Sneha M.', user_email: 'sneha@upl', rating: 3, message: 'Too crowded during lunch break today.', timestamp: Date.now() - 86400000, type: 'Seating' }, 
+  { id: '4', user_name: 'Sneha M.', user_email: 'sneha@upl', rating: 3, message: 'Too crowded during lunch break today.', timestamp: Date.now() - 86400000, type: 'Seating' },
 ];
 
 // --- PYTHON API FUNCTIONS (Status, Tables, Cameras) ---
@@ -64,12 +64,12 @@ export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableS
     const estimatedOccupied = Math.ceil(peopleInside / TABLE_CAPACITY);
     // Ensure we don't exceed total tables
     const occupied = Math.min(estimatedOccupied, TOTAL_TABLES);
-    
-    return { 
-      occupied_tables: occupied, 
-      empty_tables: TOTAL_TABLES - occupied, 
-      is_actual: false 
-    }; 
+
+    return {
+      occupied_tables: occupied,
+      empty_tables: TOTAL_TABLES - occupied,
+      is_actual: false
+    };
   }
 };
 
@@ -81,17 +81,17 @@ export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
   } catch (e) {
     // Return placeholder feeds if Python script is offline
     return [
-      { 
-        id: 'cam-01', 
-        name: 'Main Entrance', 
-        url: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=60', 
+      {
+        id: 'cam-01',
+        name: 'Main Entrance',
+        url: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=60',
         status: 'OFFLINE',
         location: 'Gate A'
       },
-      { 
-        id: 'cam-02', 
-        name: 'Dining Area', 
-        url: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=60', 
+      {
+        id: 'cam-02',
+        name: 'Dining Area',
+        url: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=60',
         status: 'OFFLINE',
         location: 'Floor 1'
       }
@@ -102,25 +102,46 @@ export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
 // --- SUPABASE DATABASE FUNCTIONS (Menu, Orders, Feedback) ---
 
 // 1. MENU MANAGEMENT
-export const fetchMenu = async (): Promise<MenuItem[]> => {
-  const { data, error } = await supabase
-    .from('menu_items')
-    .select('*');
+interface MenuRow {
+  id: string;
+  name: string;
+  price: number;
+  category: 'Snacks' | 'Meals' | 'Beverages';
+  image_url: string;
+  image?: string; // Support legacy naming
+}
 
-  if (error || !data || data.length === 0) {
-    // Fallback to INITIAL_MENU if DB is empty or fails
-    // This allows the app to work immediately without seeding
-    if (error) console.warn("Menu DB Error (using mock):", error);
+export const fetchMenu = async (): Promise<MenuItem[]> => {
+  try {
+    // Standard plural table name
+    const { data, error } = await supabase
+      .from('menu_items')
+      .select('*');
+
+    if (error) {
+      console.warn("DEBUG: Potential connection issue. Switching to Demo Mode.", error);
+      notifyError(`Supabase Offline: ${error.message}. Entering Demo Mode.`);
+      return INITIAL_MENU; // Fallback only on error
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("DEBUG: 'menu_items' table empty or RLS restricted.");
+      notifyError("Connected to DB, but 0 items found. Check RLS or add items in Admin.");
+      return []; // Return empty if connected but no data
+    }
+
+    return (data as any[]).map((item) => ({
+      id: item.id ? item.id.toString() : Math.random().toString(36).substr(2, 9),
+      name: item.name || 'Unnamed Item',
+      price: Number(item.price) || 0,
+      category: (item.category as any) || 'Snacks',
+      image: item.image_url || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
+    }));
+  } catch (err: any) {
+    console.error("DEBUG: fetchMenu Exception. Using Demo Mode.", err);
+    notifyError(`Connection Failure: ${err.message}. Showing mock menu.`);
     return INITIAL_MENU;
   }
-
-  return data.map((item: any) => ({
-    id: item.id,
-    name: item.name,
-    price: item.price,
-    category: item.category,
-    image: item.image_url || item.image // Handle both naming conventions
-  }));
 };
 
 export const addMenuItemToDB = async (item: MenuItem): Promise<boolean> => {
@@ -134,7 +155,7 @@ export const addMenuItemToDB = async (item: MenuItem): Promise<boolean> => {
     }]);
 
   if (error) {
-    notifyError("Failed to add item to database.");
+    notifyError(`Failed to add item: ${error.message}`);
     return false;
   }
   return true;
@@ -154,21 +175,31 @@ export const deleteMenuItemFromDB = async (id: string): Promise<boolean> => {
 };
 
 // 2. ORDERING SYSTEM
-export const createOrder = async (orderData: any): Promise<boolean> => {
-  // Assuming orderData contains { user_email, items, total, payment_method }
+interface OrderRow {
+  id: string;
+  user_email: string;
+  items: any; // Stored as JSONB
+  total: number;
+  payment_method: string;
+  created_at: string;
+}
+
+export const createOrder = async (order: Receipt & { user_email: string, user_name: string }): Promise<boolean> => {
   const { error } = await supabase
     .from('orders')
     .insert([{
-      user_email: orderData.user_email,
-      items: orderData.items, // Stored as JSONB
-      total: orderData.total,
-      payment_method: orderData.paymentMethod || 'UPI',
+      id: order.id,
+      user_email: order.user_email,
+      user_name: order.user_name,
+      items: order.items,
+      total: order.total,
+      payment_method: order.paymentMethod || 'UPI',
       created_at: new Date().toISOString()
     }]);
 
   if (error) {
     console.error("Order Error:", error);
-    notifyError("Failed to place order.");
+    notifyError(`Failed to place order: ${error.message}`);
     return false;
   }
   return true;
@@ -181,12 +212,15 @@ export const fetchOrderHistory = async (userEmail: string): Promise<Receipt[]> =
     .eq('user_email', userEmail)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    // notifyError("Could not fetch order history.");
+  if (error || !data) {
+    if (error) {
+      notifyError(`History Error: ${error.message}`);
+      console.error("Supabase History Error:", error);
+    }
     return [];
   }
 
-  return data.map((d: any) => ({
+  return (data as OrderRow[]).map((d) => ({
     id: d.id,
     items: d.items,
     total: d.total,
@@ -196,7 +230,17 @@ export const fetchOrderHistory = async (userEmail: string): Promise<Receipt[]> =
 };
 
 // 3. FEEDBACK & REVIEWS
-export const submitFeedbackData = async (feedback: any): Promise<boolean> => {
+interface FeedbackRow {
+  id: string;
+  user_name: string;
+  user_email: string;
+  rating: number;
+  message: string;
+  type: string;
+  created_at: string;
+}
+
+export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timestamp'>): Promise<boolean> => {
   const { error } = await supabase
     .from('feedback')
     .insert([{
@@ -209,7 +253,7 @@ export const submitFeedbackData = async (feedback: any): Promise<boolean> => {
     }]);
 
   if (error) {
-    notifyError("Failed to submit feedback.");
+    notifyError(`Failed to submit feedback: ${error.message}`);
     return false;
   }
   return true;
@@ -222,17 +266,21 @@ export const fetchReviews = async (): Promise<Feedback[]> => {
     .order('created_at', { ascending: false });
 
   if (error || !data || data.length === 0) {
+    if (error) {
+      notifyError(`Feedback Error: ${error.message}`);
+      console.error("Supabase Feedback Error:", error);
+    }
     return MOCK_FEEDBACK_STORE;
   }
 
-  return data.map((f: any) => ({
+  return (data as FeedbackRow[]).map((f) => ({
     id: f.id,
-    user_name: f.user_name,
-    user_email: f.user_email,
-    rating: f.rating,
-    message: f.message,
-    type: f.type,
-    timestamp: new Date(f.created_at).getTime()
+    user_name: f.user_name || 'Anonymous',
+    user_email: f.user_email || 'anonymous@upl',
+    rating: f.rating || 5,
+    message: f.message || '',
+    type: f.type || 'Feedback',
+    timestamp: new Date(f.created_at || Date.now()).getTime()
   }));
 };
 
@@ -249,11 +297,15 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
       .from('feedback')
       .select('rating');
 
-    if (orderError || feedbackError) throw new Error("DB Error");
+    if (orderError || feedbackError) {
+      if (orderError) notifyError(`Analytics Order Error: ${orderError.message}`);
+      if (feedbackError) notifyError(`Analytics Feedback Error: ${feedbackError.message}`);
+      throw new Error("DB Error");
+    }
 
     // If no data in DB, return Mock Analytics so the dashboard isn't empty
     if ((!orders || orders.length === 0) && (!feedback || feedback.length === 0)) {
-       return getMockAnalytics(timeframe);
+      return getMockAnalytics(timeframe);
     }
 
     // Calculate Total Revenue
@@ -281,27 +333,45 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
+    // Calculate Category Split
+    const categoryCounts: Record<string, number> = {};
+    if (orders) {
+      orders.forEach((order: any) => {
+        if (Array.isArray(order.items)) {
+          order.items.forEach((item: any) => {
+            const cat = item.category || 'Other';
+            categoryCounts[cat] = (categoryCounts[cat] || 0) + (item.quantity || 1);
+          });
+        }
+      });
+    }
+
+    const totalItems = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
+    const categorySplit = totalItems > 0 
+      ? Object.entries(categoryCounts).map(([label, value]) => ({
+          label,
+          value: Math.round((value / totalItems) * 100),
+          color: label === 'Meals' ? '#f97316' : label === 'Snacks' ? '#3b82f6' : label === 'Beverages' ? '#10b981' : '#94a3b8'
+        }))
+      : getMockAnalytics(timeframe).category_split;
+
     // Mocking trends for now as they require complex time-series grouping
-    // which is heavy to do client-side without specific DB functions
     return {
       total_revenue: totalRevenue,
       avg_rating: Number(avgRating.toFixed(1)),
       item_sales: itemSales,
-      revenue_trend: getMockAnalytics(timeframe).revenue_trend, // Keep mock trends for visuals
-      category_split: [
-         { label: 'Meals', value: 45, color: '#f97316' },
-         { label: 'Snacks', value: 30, color: '#3b82f6' },
-         { label: 'Beverages', value: 25, color: '#10b981' }
-      ],
-      occupancy_trend: getMockAnalytics(timeframe).occupancy_trend, // Keep mock trends for visuals
+      revenue_trend: getMockAnalytics(timeframe).revenue_trend,
+      category_split: categorySplit,
+      occupancy_trend: getMockAnalytics(timeframe).occupancy_trend,
       top_items: itemSales.length > 0 ? itemSales.slice(0, 3).map(i => ({
         name: i.name,
-        rating: 4.5, // Default
+        rating: 4.5,
         category: 'Popular'
       })) : getMockAnalytics(timeframe).top_items
     };
 
-  } catch (e) {
+  } catch (e: any) {
+    notifyError(`Analytics Error: ${e.message}`);
     console.error("Analytics Error:", e);
     return getMockAnalytics(timeframe);
   }
@@ -309,91 +379,91 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
 
 // --- HELPER: MOCK ANALYTICS GENERATOR ---
 const getMockAnalytics = (timeframe: string): AnalyticsData => {
-    let multiplier = 1;
-    let trendData = [];
-    let occupancyTrend = [];
-    
-    if (timeframe === 'daily') {
-       trendData = [
-         { label: '8am', value: 1200 },
-         { label: '10am', value: 3500 },
-         { label: '12pm', value: 8900 },
-         { label: '2pm', value: 6500 },
-         { label: '4pm', value: 4200 },
-         { label: '6pm', value: 5800 },
-         { label: '8pm', value: 3100 }
-       ];
-       occupancyTrend = [
-         { label: '8am', value: 12 },
-         { label: '10am', value: 38 },
-         { label: '12pm', value: 55 },
-         { label: '2pm', value: 48 },
-         { label: '4pm', value: 25 },
-         { label: '6pm', value: 42 },
-         { label: '8pm', value: 18 }
-       ];
-    } else if (timeframe === 'weekly') {
-       multiplier = 6.5; 
-       trendData = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
-          label: day,
-          value: Math.floor(Math.random() * 5000) + 10000
-       }));
-       occupancyTrend = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
-          label: day,
-          value: Math.floor(Math.random() * 30) + 20
-       }));
-    } else {
-       multiplier = 26;
-       trendData = ['W1', 'W2', 'W3', 'W4'].map(w => ({
-          label: w,
-          value: Math.floor(Math.random() * 20000) + 40000
-       }));
-       occupancyTrend = ['W1', 'W2', 'W3', 'W4'].map(w => ({
-          label: w,
-          value: Math.floor(Math.random() * 25) + 25
-       }));
-    }
+  let multiplier = 1;
+  let trendData = [];
+  let occupancyTrend = [];
 
-    const baseRevenue = 12500;
-    
-    return {
-      total_revenue: Math.floor(baseRevenue * multiplier * (0.9 + Math.random() * 0.2)),
-      avg_rating: 4.2,
-      item_sales: [
-        { name: 'Veg Burger', value: Math.floor(45 * multiplier) },
-        { name: 'Cold Coffee', value: Math.floor(80 * multiplier) },
-        { name: 'Chicken Biryani', value: Math.floor(30 * multiplier) },
-        { name: 'Paneer Wrap', value: Math.floor(55 * multiplier) },
-        { name: 'Fresh Lime Soda', value: Math.floor(65 * multiplier) }
-      ],
-      revenue_trend: trendData,
-      category_split: [
-         { label: 'Meals', value: 45, color: '#f97316' }, 
-         { label: 'Snacks', value: 30, color: '#3b82f6' }, 
-         { label: 'Beverages', value: 25, color: '#10b981' } 
-      ],
-      occupancy_trend: occupancyTrend,
-      top_items: [
-        { 
-          name: 'Chicken Biryani', 
-          rating: 4.8, 
-          category: 'Meals',
-          image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500&auto=format&fit=crop&q=60'
-        },
-        { 
-          name: 'Cold Coffee', 
-          rating: 4.6, 
-          category: 'Beverages', 
-          image: 'https://images.unsplash.com/photo-1578314675249-a6910f80cc4e?w=500&auto=format&fit=crop&q=60'
-        },
-        { 
-          name: 'Paneer Wrap', 
-          rating: 4.5, 
-          category: 'Snacks', 
-          image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=500&auto=format&fit=crop&q=60'
-        }
-      ]
-    };
+  if (timeframe === 'daily') {
+    trendData = [
+      { label: '8am', value: 1200 },
+      { label: '10am', value: 3500 },
+      { label: '12pm', value: 8900 },
+      { label: '2pm', value: 6500 },
+      { label: '4pm', value: 4200 },
+      { label: '6pm', value: 5800 },
+      { label: '8pm', value: 3100 }
+    ];
+    occupancyTrend = [
+      { label: '8am', value: 12 },
+      { label: '10am', value: 38 },
+      { label: '12pm', value: 55 },
+      { label: '2pm', value: 48 },
+      { label: '4pm', value: 25 },
+      { label: '6pm', value: 42 },
+      { label: '8pm', value: 18 }
+    ];
+  } else if (timeframe === 'weekly') {
+    multiplier = 6.5;
+    trendData = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+      label: day,
+      value: Math.floor(Math.random() * 5000) + 10000
+    }));
+    occupancyTrend = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+      label: day,
+      value: Math.floor(Math.random() * 30) + 20
+    }));
+  } else {
+    multiplier = 26;
+    trendData = ['W1', 'W2', 'W3', 'W4'].map(w => ({
+      label: w,
+      value: Math.floor(Math.random() * 20000) + 40000
+    }));
+    occupancyTrend = ['W1', 'W2', 'W3', 'W4'].map(w => ({
+      label: w,
+      value: Math.floor(Math.random() * 25) + 25
+    }));
+  }
+
+  const baseRevenue = 12500;
+
+  return {
+    total_revenue: Math.floor(baseRevenue * multiplier * (0.9 + Math.random() * 0.2)),
+    avg_rating: 4.2,
+    item_sales: [
+      { name: 'Veg Burger', value: Math.floor(45 * multiplier) },
+      { name: 'Cold Coffee', value: Math.floor(80 * multiplier) },
+      { name: 'Chicken Biryani', value: Math.floor(30 * multiplier) },
+      { name: 'Paneer Wrap', value: Math.floor(55 * multiplier) },
+      { name: 'Fresh Lime Soda', value: Math.floor(65 * multiplier) }
+    ],
+    revenue_trend: trendData,
+    category_split: [
+      { label: 'Meals', value: 45, color: '#f97316' },
+      { label: 'Snacks', value: 30, color: '#3b82f6' },
+      { label: 'Beverages', value: 25, color: '#10b981' }
+    ],
+    occupancy_trend: occupancyTrend,
+    top_items: [
+      {
+        name: 'Chicken Biryani',
+        rating: 4.8,
+        category: 'Meals',
+        image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500&auto=format&fit=crop&q=60'
+      },
+      {
+        name: 'Cold Coffee',
+        rating: 4.6,
+        category: 'Beverages',
+        image: 'https://images.unsplash.com/photo-1578314675249-a6910f80cc4e?w=500&auto=format&fit=crop&q=60'
+      },
+      {
+        name: 'Paneer Wrap',
+        rating: 4.5,
+        category: 'Snacks',
+        image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=500&auto=format&fit=crop&q=60'
+      }
+    ]
+  };
 };
 
 // --- AUTHENTICATION ---
@@ -410,7 +480,7 @@ export const loginUser = async (emailOrUser: string, password?: string): Promise
       // Fallback for the specific hardcoded admin if Supabase Auth isn't set up with it yet
       // This helps keep the demo working if the user hasn't created the user in Supabase
       if (emailOrUser === 'admin' && password === 'admin123') {
-         return { id: 'admin-local', email: 'admin', name: 'Administrator', role: 'ADMIN' };
+        return { id: 'admin-local', email: 'admin', name: 'Administrator', role: 'ADMIN' };
       }
       return null;
     }
@@ -421,21 +491,21 @@ export const loginUser = async (emailOrUser: string, password?: string): Promise
       name: 'Administrator', // You might fetch this from a profiles table
       role: 'ADMIN'
     };
-  } 
-  
+  }
+
   // 2. Student "Login" (Guest Mode)
   // Just validates the email format for the demo
   if (emailOrUser.toLowerCase().endsWith('@upl') || emailOrUser.includes('@')) {
     const namePart = emailOrUser.split('@')[0];
     const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-    return { 
-      id: `stu-${Date.now()}`, 
-      email: emailOrUser, 
-      name: formattedName, 
-      role: 'STUDENT' 
+    return {
+      id: `stu-${Date.now()}`,
+      email: emailOrUser,
+      name: formattedName,
+      role: 'STUDENT'
     };
   }
-  
+
   return null;
 };
 
