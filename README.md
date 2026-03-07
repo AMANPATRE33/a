@@ -161,7 +161,7 @@ To run the full system locally (Frontend + Backend):
 
 ---
 
-## 🆕 Latest Updates (March 2024)
+## 🆕 Latest Updates (March 2026)
 
 We have recently upgraded **Smart Anna** with several "smart" features to make it more reliable and professional:
 
@@ -172,5 +172,6 @@ We have recently upgraded **Smart Anna** with several "smart" features to make i
 5.  **🍱 Fixed Menu Loading**: We solved a bug where the food menu was showing up blank. It is now perfectly synced with your Supabase cloud database.
 
 ---
-© 2024 • All Rights Reserved to UPL University
+© 2026 • All Rights Reserved to UPL University - BE 8 Project Team 
+
 
