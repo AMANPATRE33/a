@@ -356,6 +356,7 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showReceipt, setShowReceipt] = useState<Receipt | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false); // NEW: Confirmation state
+  const [showUpiModal, setShowUpiModal] = useState(false); // NEW: UPI Modal state
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [receiptTimer, setReceiptTimer] = useState(120);
   const [notification, setNotification] = useState<string | null>(null);
@@ -411,10 +412,22 @@ const App: React.FC = () => {
           
           const items = await fetchMenu();
           if (items.length > 0) {
-             // Logic to pick "Today's Best": 
-             // 1. Try to find a "Special" or high-value item (simulated by name)
-             // 2. Fallback to random item
-             const bestItem = items.find(i => i.name.includes('Biryani') || i.name.includes('Thali')) || items[Math.floor(Math.random() * items.length)];
+             let bestItem = null;
+             try {
+                // Fetch dynamic analytics to get the most ordered item
+                const analytics = await fetchAnalytics('daily');
+                if (analytics?.item_sales?.length > 0) {
+                   const topItemData = [...analytics.item_sales].sort((a, b) => b.value - a.value)[0];
+                   bestItem = items.find(i => i.name.toLowerCase().includes(topItemData.name.toLowerCase()));
+                }
+             } catch (e) {
+                console.warn("Could not fetch analytics for recommendation", e);
+             }
+             
+             // Fallback to a special item or random if analytics fails
+             if (!bestItem) {
+                bestItem = items.find(i => i.name.includes('Biryani') || i.name.includes('Thali')) || items[Math.floor(Math.random() * items.length)];
+             }
              
              setRecommendation(bestItem);
              setShowRecommendation(true);
@@ -593,10 +606,9 @@ const App: React.FC = () => {
 
     const success = await addMenuItemToDB(item);
     if (!success) {
-      // If failed, maybe revert or show error (currently logic was inverted in original code?)
-      // Original: if (!success) refreshMenu() else notification
-      // We want to refresh on success to get IDs
-      refreshMenu(); 
+      // Revert optimistic update
+      setMenu(menu); 
+      showNotification(`Failed to add "${item.name}". Ensure database is connected.`);
     } else {
       showNotification(`"${item.name}" added successfully.`);
       refreshMenu(); // Refresh to get the DB ID
@@ -681,8 +693,15 @@ const App: React.FC = () => {
     });
   };
 
-  const handlePayment = async (method: string) => {
+  const handlePayment = async (method: string, skipModal: boolean = false) => {
     if (cart.length === 0 || !user) return;
+    
+    if (method === 'UPI' && !skipModal) {
+      setShowUpiModal(true);
+      return;
+    }
+    
+    setShowUpiModal(false);
     setIsProcessingPayment(true);
     
     const totalAmount = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
@@ -821,12 +840,12 @@ const App: React.FC = () => {
               <div className="auth-card-outer max-w-md w-full relative z-10">
                 <div className="auth-card-inner bg-white dark:bg-slate-900 p-8 md:p-12">
                   <div className="flex flex-col items-center mb-10">
-                    <div className="relative mb-8">
+                    <div className="relative mb-8 hidden md:block">
                       <div className="absolute inset-0 bg-orange-400 blur-3xl opacity-30 animate-pulse"></div>
                       <SmartAnnaLogo className="relative z-10" />
                     </div>
                     <h1 className="text-5xl font-black text-slate-900 dark:text-white text-center tracking-tighter">Smart Anna</h1>
-                    <p className="text-sm font-black text-orange-600 dark:text-orange-400 uppercase tracking-[0.4em] mt-4">Intelligence at your service</p>
+                    <p className="text-center text-sm font-black text-orange-600 dark:text-orange-400 uppercase tracking-[0.4em] mt-4">Intelligence at your service</p>
                     <p className="text-slate-500 dark:text-slate-400 font-medium text-center mt-4 text-base italic">
                       "Swift. Smart. Satisfying."
                     </p>
@@ -912,7 +931,7 @@ const App: React.FC = () => {
                     <button 
                       type="submit" 
                       disabled={authLoading}
-                      className="w-full bg-slate-900 dark:bg-orange-600 text-white py-5 rounded-2xl font-black text-sm hover:bg-slate-800 dark:hover:bg-orange-700 transition-all flex items-center justify-center gap-2 mt-6 shadow-xl shadow-slate-300 dark:shadow-none transform active:scale-95 min-h-[64px]"
+                      className="w-full bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-600 text-white py-5 rounded-2xl font-black text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-6 shadow-xl shadow-slate-300 dark:shadow-orange-900/50 transform active:scale-95 min-h-[64px]"
                     >
                       {authLoading ? (
                         <span>Processing...</span>
@@ -977,14 +996,14 @@ const App: React.FC = () => {
                            </div>
                         </div>
                         {isDashboardLoading ? (
-                           <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-1.5 md:gap-3">
+                           <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-1.5 md:gap-3">
                               {Array.from({ length: TOTAL_TABLES }).map((_, i) => (
                                  <Skeleton key={i} className="aspect-square rounded-lg" />
                               ))}
                            </div>
                         ) : (
                            <div className="md:max-h-none overflow-y-auto custom-scrollbar pr-2 md:pr-0">
-                             <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-2 md:gap-3">
+                             <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 md:gap-3">
                                 {Array.from({ length: TOTAL_TABLES }).map((_, i) => {
                                    const capacity = TABLE_CAPACITY;
                                    const totalPeople = liveStatus.people_inside;
@@ -1214,7 +1233,7 @@ const App: React.FC = () => {
                                           </p>
                                         </div>
                                       </div>
-                                      <img src={item.image} alt={item.name} className="img" />
+                                      <img src={item.image} alt={item.name} className="img object-cover h-32 w-full rounded-b-xl" />
                                     </div>
                                     <div className="flip-back">
                                       <div className="flip-back-content">
@@ -1231,7 +1250,7 @@ const App: React.FC = () => {
                                               addToCart(item);
                                               showNotification(`${item.name} added!`);
                                             }} 
-                                            className="bg-white text-orange-600 px-6 py-2 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-transform shadow-lg"
+                                            className="bg-white text-orange-600 px-6 py-2 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-transform shadow-[0_0_15px_rgba(255,255,255,0.3)]"
                                           >
                                             ADD TO CART
                                           </button>
@@ -1248,7 +1267,7 @@ const App: React.FC = () => {
                                     addToCart(item);
                                     showNotification(`${item.name} added!`);
                                   }}
-                                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-orange-600 text-white px-6 py-2.5 rounded-full font-black text-xs shadow-xl hover:bg-orange-700 active:scale-95 transition-all z-20 flex items-center gap-2 border-4 border-slate-50 dark:border-slate-950 whitespace-nowrap"
+                                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-red-600 text-white px-6 py-2.5 rounded-full font-black text-xs shadow-xl active:scale-95 transition-all z-20 flex items-center gap-2 border-4 border-slate-50 dark:border-slate-950 whitespace-nowrap"
                                 >
                                   <Plus size={14} strokeWidth={4} /> ADD
                                 </button>
@@ -1548,8 +1567,8 @@ const App: React.FC = () => {
          )}
          
          {activeTab === 'ordering' && cart.length > 0 && !isMobileCartOpen && (
-            <div className="md:hidden fixed bottom-32 left-4 right-4 z-40 animate-bounce-in">
-               <button onClick={() => setIsMobileCartOpen(true)} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl shadow-xl flex items-center justify-between transition-all active:scale-95">
+            <div className="md:hidden fixed bottom-24 left-4 right-4 z-[45] animate-bounce-in">
+               <button onClick={() => setIsMobileCartOpen(true)} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl shadow-2xl flex items-center justify-between transition-all active:scale-95 border border-white/10 dark:border-black/10">
                   <div className="flex flex-col items-start">
                      <span className="text-[10px] font-black opacity-80 uppercase tracking-widest">{cart.reduce((a,b)=>a+b.quantity,0)} ITEMS</span>
                      <span className="text-lg font-black leading-none mt-0.5">₹{cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span>
@@ -1609,7 +1628,7 @@ const App: React.FC = () => {
                      <span>Total</span>
                      <span>₹{cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span>
                   </div>
-                  <button onClick={() => setShowConfirmation(true)} className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                  <button onClick={() => setShowConfirmation(true)} className="w-full bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-500 dark:text-white text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-orange-500/20">
                      Pay via UPI <ChevronRight size={16} />
                   </button>
                </div>
@@ -1663,7 +1682,7 @@ const App: React.FC = () => {
                    </button>
                    <button 
                       onClick={() => { setShowConfirmation(false); handlePayment('UPI'); }} 
-                      className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-4 bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-600 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
                    >
                       Confirm & Pay
                    </button>
@@ -1673,36 +1692,72 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* UPI MODAL */}
+      {showUpiModal && (
+        <div className="fixed inset-0 bg-slate-950/60 dark:bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl p-6 md:p-8 relative overflow-hidden flex flex-col items-center animate-bounce-in">
+             <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                   <Zap size={32} strokeWidth={2.5} />
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Pay with UPI</h2>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Scan QR Code or Open App</p>
+             </div>
+
+             <div className="bg-white p-4 rounded-2xl shadow-inner border-2 border-slate-100 mb-6 relative">
+                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR`} alt="UPI QR Code" className="w-48 h-48 mx-auto" />
+                 <div className="absolute inset-0 ring-4 ring-orange-500/20 rounded-2xl pointer-events-none"></div>
+             </div>
+             
+             <div className="text-center mb-6 w-full">
+                 <div className="text-sm font-bold text-slate-500 mb-1">Amount to Pay</div>
+                 <div className="text-3xl font-black text-slate-900 dark:text-white">₹{cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</div>
+             </div>
+
+             <div className="w-full space-y-3 shrink-0">
+                <button 
+                    onClick={() => handlePayment('UPI', true)} 
+                    className="w-full py-4 bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-600 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+                >
+                    Pay with UPI App <ArrowRight size={18} />
+                </button>
+                <button 
+                    onClick={() => setShowUpiModal(false)} 
+                    className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-2xl font-black text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                >
+                    Cancel
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* --- PAYMENT PROCESSING OVERLAY --- */}
       {isProcessingPayment && (
-        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-4 transition-all duration-300">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center max-w-sm w-full relative overflow-hidden">
-            {/* Background Decor */}
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 via-red-500 to-orange-400 animate-[pulse_2s_infinite]"></div>
-            
-            {/* Icon Animation */}
-            <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
-              <div className="absolute inset-0 bg-orange-100 dark:bg-orange-900/20 rounded-full animate-ping opacity-75"></div>
-              <div className="absolute inset-2 bg-orange-200 dark:bg-orange-800/20 rounded-full animate-pulse"></div>
-              <div className="relative z-10 bg-white dark:bg-slate-800 p-4 rounded-full shadow-lg border border-orange-100 dark:border-slate-700">
-                 <ShieldCheck size={32} className="text-orange-600 dark:text-orange-400" />
+        <div className="fixed inset-0 z-[120] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 transition-all duration-300">
+          <div className="flex flex-col items-center gap-10">
+            <div className="payment-loader-container">
+              <div className="payment-loader-left-side">
+                <div className="payment-loader-card">
+                  <div className="payment-loader-card-line"></div>
+                  <div className="payment-loader-buttons"></div>
+                </div>
+                <div className="payment-loader-post">
+                  <div className="payment-loader-post-line"></div>
+                  <div className="payment-loader-screen"></div>
+                  <div className="payment-loader-numbers"></div>
+                  <div className="payment-loader-numbers-line2"></div>
+                </div>
+                <div className="payment-loader-dollar">$</div>
               </div>
-              {/* Spinning Ring */}
-              <div className="absolute inset-0 animate-spin">
-                 <div className="w-3 h-3 bg-green-500 rounded-full absolute top-0 left-1/2 -translate-x-1/2 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+              <div className="payment-loader-right-side">
+                <div className="payment-loader-new-text">Verifying...</div>
               </div>
             </div>
-
-            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Processing Payment</h3>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 text-center">
-              Securely communicating with bank servers...
-            </p>
             
-            {/* Steps Animation */}
-            <div className="flex gap-2 mt-6">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700 animate-[bounce_1s_infinite_0ms]"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700 animate-[bounce_1s_infinite_200ms]"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700 animate-[bounce_1s_infinite_400ms]"></div>
+            <div className="text-center">
+              <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Verifying Transaction</h3>
+              <p className="text-orange-500 font-black text-[10px] uppercase tracking-[0.2em] animate-pulse">Secure Bank Communication Active</p>
             </div>
           </div>
         </div>
@@ -1815,7 +1870,7 @@ const NavItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: str
 const MobileNavItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
    <button 
      onClick={onClick} 
-     className={`relative flex items-center justify-center h-12 rounded-full transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${active ? 'flex-grow bg-orange-600 text-white shadow-lg shadow-orange-500/30 px-5 mx-1' : 'w-12 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent'}`}
+     className={`relative flex items-center justify-center h-12 rounded-full transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${active ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/40 w-[35%] mx-1' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent flex-1'}`}
    >
       <Icon size={active ? 20 : 24} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
       {active && (

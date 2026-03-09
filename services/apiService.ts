@@ -9,6 +9,7 @@ import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
  * - Table Sensors
  * - Camera Feeds
  */
+// 👉 PASTE PYTHON BACKEND API URL BELOW FOR STATUS AND TABLE ESTIMATE 👈
 const PYTHON_API_URL = `http://${window.location.hostname}:5000`;
 
 // --- ERROR HANDLING SYSTEM ---
@@ -43,7 +44,7 @@ export const fetchStatus = async (): Promise<CafeteriaStatus> => {
     if (!response.ok) throw new Error('API unreachable');
     return await response.json();
   } catch (error) {
-    // console.error("Python API Error (Status):", error);
+    notifyError("Python API Offline: Falling back to mock live status estimation.");
     // Return a safe default if Python script is offline
     return {
       people_inside: Math.floor(Math.random() * 35) + 5, // Random occupancy between 5 and 40
@@ -59,6 +60,7 @@ export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableS
     const data = await response.json();
     return { ...data, is_actual: true };
   } catch (error) {
+    notifyError("Python API Offline: Falling back to AI table capacity estimation.");
     // Fallback: Estimate based on people count if sensors fail
     // Logic: 4 students occupy 1 table approx.
     const estimatedOccupied = Math.ceil(peopleInside / TABLE_CAPACITY);
@@ -79,6 +81,7 @@ export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
     if (!response.ok) throw new Error("Cameras API unreachable");
     return await response.json();
   } catch (e) {
+    notifyError("Python API Offline: Displaying demo camera feeds.");
     // Return placeholder feeds if Python script is offline
     return [
       {
@@ -244,7 +247,6 @@ export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timest
   const { error } = await supabase
     .from('feedback')
     .insert([{
-      user_name: feedback.user_name,
       user_email: feedback.user_email,
       rating: feedback.rating,
       message: feedback.message,

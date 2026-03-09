@@ -453,8 +453,8 @@
         width: 100%;
         height: 100%;
         transform-style: preserve-3d;
-        transition: transform 600ms; /* Slowed down slightly for smoother effect */
-        box-shadow: 0px 0px 10px 1px #00000033;
+        transition: transform 400ms cubic-bezier(0.25, 0.8, 0.25, 1); /* Faster, snappier flip with a nice curve */
+        box-shadow: 0px 0px 15px 2px #00000044;
         border-radius: 1rem;
       }
 
@@ -495,8 +495,8 @@
         display: block;
         width: 160px;
         height: 160%;
-        /* Updated Gradient to match Orange Theme */
-        background: linear-gradient(90deg, transparent, #ea580c, #ea580c, #ea580c, #ea580c, transparent);
+        /* Updated Gradient to match Orange/Red Theme */
+        background: linear-gradient(90deg, transparent, #ea580c, #ef4444, #ea580c, transparent);
         animation: rotation_481 5000ms infinite linear;
       }
 
@@ -610,6 +610,213 @@
         0% { transform: translateY(0px); }
         50% { transform: translateY(10px); }
         100% { transform: translateY(0px); }
+      }
+
+      /* --- CUSTOM PAYMENT LOADER --- */
+      .payment-loader-container {
+        background-color: transparent;
+        display: flex;
+        width: 320px;
+        height: 120px;
+        position: relative;
+        border-radius: 2rem;
+        transition: 0.3s ease-in-out;
+        align-items: center;
+        justify-content: center;
+        scale: 0.8;
+      }
+      
+      .payment-loader-left-side {
+        background-color: #5de2a3;
+        width: 130px;
+        height: 120px;
+        border-radius: 1.5rem;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        transition: 0.3s;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      
+      .payment-loader-container:hover .payment-loader-left-side {
+        width: 100%;
+      }
+      
+      .payment-loader-right-side {
+        width: calc(100% - 130px);
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        cursor: pointer;
+        justify-content: space-between;
+        white-space: nowrap;
+        transition: 0.3s;
+      }
+      
+      .payment-loader-new-text {
+        font-size: 18px;
+        font-weight: 900;
+        margin-left: 20px;
+        color: white;
+      }
+      
+      .payment-loader-card {
+        width: 70px;
+        height: 46px;
+        background-color: #c7ffbc;
+        border-radius: 6px;
+        position: absolute;
+        display: flex;
+        z-index: 10;
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 9px 9px 9px -2px rgba(77, 200, 143, 0.72);
+      }
+      
+      .payment-loader-card-line {
+        width: 65px;
+        height: 13px;
+        background-color: #80ea69;
+        border-radius: 2px;
+        margin-top: 7px;
+      }
+      
+      .payment-loader-buttons {
+        width: 8px;
+        height: 8px;
+        background-color: #379e1f;
+        box-shadow: 0 -10px 0 0 #26850e, 0 10px 0 0 #56be3e;
+        border-radius: 50%;
+        margin-top: 5px;
+        transform: rotate(90deg);
+        margin: 10px 0 0 -30px;
+      }
+      
+      .payment-loader-container .payment-loader-card {
+        animation: payment-slide-top 1.2s cubic-bezier(0.645, 0.045, 0.355, 1) infinite;
+      }
+      
+      .payment-loader-container .payment-loader-post {
+        animation: payment-slide-post 1.2s cubic-bezier(0.165, 0.84, 0.44, 1) infinite;
+      }
+      
+      @keyframes payment-slide-top {
+        0% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-70px) rotate(90deg);
+        }
+        60% {
+          transform: translateY(-70px) rotate(90deg);
+        }
+        100% {
+          transform: translateY(-8px) rotate(90deg);
+        }
+      }
+      
+      .payment-loader-post {
+        width: 63px;
+        height: 75px;
+        background-color: #dddde0;
+        position: absolute;
+        z-index: 11;
+        bottom: 10px;
+        top: 120px;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      
+      .payment-loader-post-line {
+        width: 47px;
+        height: 9px;
+        background-color: #545354;
+        position: absolute;
+        border-radius: 0px 0px 3px 3px;
+        right: 8px;
+        top: 8px;
+      }
+      
+      .payment-loader-post-line:before {
+        content: "";
+        position: absolute;
+        width: 47px;
+        height: 9px;
+        background-color: #757375;
+        top: -8px;
+      }
+      
+      .payment-loader-screen {
+        width: 47px;
+        height: 23px;
+        background-color: #ffffff;
+        position: absolute;
+        top: 22px;
+        right: 8px;
+        border-radius: 3px;
+      }
+      
+      .payment-loader-numbers {
+        width: 12px;
+        height: 12px;
+        background-color: #838183;
+        box-shadow: 0 -18px 0 0 #838183, 0 18px 0 0 #838183;
+        border-radius: 2px;
+        position: absolute;
+        transform: rotate(90deg);
+        left: 25px;
+        top: 52px;
+      }
+      
+      .payment-loader-numbers-line2 {
+        width: 12px;
+        height: 12px;
+        background-color: #aaa9ab;
+        box-shadow: 0 -18px 0 0 #aaa9ab, 0 18px 0 0 #aaa9ab;
+        border-radius: 2px;
+        position: absolute;
+        transform: rotate(90deg);
+        left: 25px;
+        top: 68px;
+      }
+      
+      @keyframes payment-slide-post {
+        0%, 50% {
+          transform: translateY(0);
+        }
+        100% {
+          transform: translateY(-70px);
+        }
+      }
+      
+      .payment-loader-dollar {
+        position: absolute;
+        font-size: 16px;
+        font-weight: 900;
+        width: 100%;
+        left: 0;
+        top: 0;
+        color: #4b953b;
+        text-align: center;
+        opacity: 0;
+      }
+      
+      .payment-loader-container .payment-loader-dollar {
+        animation: payment-fade-in-fwd 0.3s 1s backwards infinite;
+      }
+      
+      @keyframes payment-fade-in-fwd {
+        0% {
+          opacity: 0;
+          transform: translateY(-5px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
     </style>
   <script type="importmap">
