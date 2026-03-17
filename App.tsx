@@ -205,10 +205,11 @@ const SimpleLineChart = ({ data }: { data: { label: string, value: number }[] })
    const height = 200;
    const padding = 20;
    const maxValue = Math.max(...data.map(d => d.value));
+   const safeMax = maxValue <= 0 ? 1 : maxValue;
    
    const points = data.map((d, i) => {
       const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
-      const y = height - ((d.value / maxValue) * (height - 2 * padding)) - padding;
+      const y = height - ((d.value / safeMax) * (height - 2 * padding)) - padding;
       return `${x},${y}`;
    }).join(' ');
 
@@ -227,7 +228,7 @@ const SimpleLineChart = ({ data }: { data: { label: string, value: number }[] })
          <polyline points={points} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
          {data.map((d, i) => {
             const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
-            const y = height - ((d.value / maxValue) * (height - 2 * padding)) - padding;
+            const y = height - ((d.value / safeMax) * (height - 2 * padding)) - padding;
             return (
                <circle key={i} cx={x} cy={y} r="4" className="fill-white stroke-orange-500 stroke-2" />
             );
@@ -241,7 +242,8 @@ const SimpleLineChart = ({ data }: { data: { label: string, value: number }[] })
 };
 
 const SimpleDoughnutChart = ({ data }: { data: { label: string, value: number, color: string }[] }) => {
-  const total = data.reduce((a, b) => a + b.value, 0);
+  const rawTotal = data.reduce((a, b) => a + b.value, 0);
+  const total = rawTotal <= 0 ? 1 : rawTotal;
   let cumulativePercent = 0;
 
   function getCoordinatesForPercent(percent: number) {
@@ -254,8 +256,9 @@ const SimpleDoughnutChart = ({ data }: { data: { label: string, value: number, c
     <div className="relative w-48 h-48 mx-auto">
       <svg viewBox="-1 -1 2 2" className="transform -rotate-90 w-full h-full">
         {data.map((slice, i) => {
+          if (rawTotal === 0 && i > 0) return null; // Only draw one grey circle if empty
           const startPercent = cumulativePercent;
-          const slicePercent = slice.value / total;
+          const slicePercent = rawTotal === 0 ? 1 : slice.value / total;
           cumulativePercent += slicePercent;
           
           const [startX, startY] = getCoordinatesForPercent(startPercent);
@@ -276,7 +279,7 @@ const SimpleDoughnutChart = ({ data }: { data: { label: string, value: number, c
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-xs font-medium text-slate-400">TOTAL</span>
-        <span className="text-xl font-black text-slate-900 dark:text-white">{total}%</span>
+        <span className="text-xl font-black text-slate-900 dark:text-white">{rawTotal}%</span>
       </div>
     </div>
   );
@@ -289,6 +292,7 @@ const SimpleBarChart = ({ data }: { data: { label: string, value: number }[] }) 
    const height = 200;
    const padding = 30;
    const maxValue = Math.max(...data.map(d => d.value));
+   const safeMax = maxValue <= 0 ? 1 : maxValue;
    const barWidth = (width - 2 * padding) / data.length * 0.6; // 60% of available slot width
 
    return (
@@ -299,7 +303,7 @@ const SimpleBarChart = ({ data }: { data: { label: string, value: number }[] }) 
          {data.map((d, i) => {
             const slotWidth = (width - 2 * padding) / data.length;
             const x = padding + (i * slotWidth) + (slotWidth - barWidth) / 2;
-            const barHeight = (d.value / maxValue) * (height - 2 * padding);
+            const barHeight = (d.value / safeMax) * (height - 2 * padding);
             const y = height - padding - barHeight;
             
             return (
@@ -365,6 +369,7 @@ const App: React.FC = () => {
   
   // NEW: Mobile Cart Modal State
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  const [isMobileAdminMenuOpen, setIsMobileAdminMenuOpen] = useState(false); // NEW: Mobile Admin Menu Toggle
   
   // Real-time Clock for Camera Feeds
   const [camTimestamp, setCamTimestamp] = useState(new Date());
@@ -743,24 +748,28 @@ const App: React.FC = () => {
     setIsProcessingPayment(false);
   };
 
-  const StatusCard = ({ title, value, icon: Icon, color, subLabel, loading }: { title: string, value?: string | number, icon: any, color: string, subLabel?: React.ReactNode, loading?: boolean }) => (
-    <div className="bg-white dark:bg-slate-900 p-3 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 transition-all hover:shadow-md active:scale-95 transform duration-300 flex flex-col justify-between min-h-[110px] md:min-h-[140px]">
-      <div className="flex items-center justify-between mb-2">
-        <div className={`p-1.5 md:p-2 rounded-xl ${color} bg-opacity-10 dark:bg-opacity-20`}>
-          <Icon className={`w-4 h-4 md:w-5 md:h-5 ${color.replace('bg-', 'text-')}`} />
+  const StatusCard = ({ title, value, icon: Icon, color, subLabel, loading }: { title: string, value?: string | number, icon: any, color: string, subLabel?: React.ReactNode, loading?: boolean }) => {
+    const bgColorClass = color.split(' ')[0];
+    const textColorClass = color.split(' ')[1];
+    return (
+    <div className={`relative bg-white dark:bg-slate-900 overflow-hidden p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 border border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-between min-h-[120px] md:min-h-[150px] group`}>
+      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full blur-3xl opacity-10 group-hover:opacity-30 transition-opacity duration-500 pointer-events-none ${bgColorClass}`}></div>
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className={`w-4 h-4 md:w-5 md:h-5 ${textColorClass}`} />
         </div>
-        <span className="text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest truncate ml-2">{title}</span>
+        <span className="text-[10px] md:text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest truncate ml-2">{title}</span>
       </div>
-      <div>
+      <div className="relative z-10 mt-auto">
          {loading ? (
             <Skeleton className="h-6 md:h-8 w-16 md:w-24 mb-2" />
          ) : (
-            <div className="text-lg md:text-2xl font-black text-slate-800 dark:text-slate-100 truncate">{value}</div>
+            <div className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white truncate tracking-tight">{value}</div>
          )}
-         {loading ? <Skeleton className="h-3 md:h-4 w-12 md:w-16" /> : subLabel && <div className="mt-1 md:mt-2 scale-90 origin-left md:scale-100">{subLabel}</div>}
+         {loading ? <Skeleton className="h-3 md:h-4 w-12 md:w-16" /> : subLabel && <div className="mt-1 md:mt-2 scale-90 origin-left md:scale-100 opacity-80">{subLabel}</div>}
       </div>
     </div>
-  );
+  )};
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#fcfdfe] dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -1455,11 +1464,19 @@ const App: React.FC = () => {
                   
                   {analyticsData && (
                      <div className="space-y-8">
+                        {/* QUICK ACTIONS ROW */}
+                        <div className="flex flex-wrap gap-3 md:gap-4 pb-2">
+                           <button onClick={() => { setAnalyticsData(null); fetchAnalytics(analyticsTimeframe).then(setAnalyticsData); }} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:-translate-y-0.5 transition-all shadow-sm"><RefreshCw size={16}/> Refresh</button>
+                           <button onClick={() => setActiveTab('admin')} className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:-translate-y-0.5 transition-all active:scale-95"><PlusCircle size={16}/> Add Menu Item</button>
+                           <button onClick={() => showNotification("Report generation coming soon.")} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-sm"><FileText size={16} className="text-blue-500"/> Export Report</button>
+                           <button onClick={() => setActiveTab('feedback')} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-sm"><MessageSquare size={16} className="text-yellow-500"/> View All Bugs</button>
+                        </div>
+
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                             <StatusCard title="Total Revenue" value={`₹${analyticsData.total_revenue.toLocaleString()}`} icon={DollarSign} color="bg-green-500 text-green-500" />
                             <StatusCard title="Avg Rating" value={analyticsData.avg_rating} icon={Star} color="bg-yellow-500 text-yellow-500" />
                             <StatusCard title="Active Tables" value={`${tableStatus?.occupied_tables || 0}/${TOTAL_TABLES}`} icon={Armchair} color="bg-blue-500 text-blue-500" />
-                            <StatusCard title="Top Seller" value={analyticsData.top_items[0]?.name.split(' ')[0]} icon={Award} color="bg-purple-500 text-purple-500" />
+                            <StatusCard title="Top Seller" value={analyticsData.top_items[0]?.name.split(' ')[0] || 'N/A'} icon={Award} color="bg-purple-500 text-purple-500" />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -1504,24 +1521,39 @@ const App: React.FC = () => {
                                 <button onClick={() => setActiveTab('feedback')} className="text-xs font-bold text-orange-600 hover:text-orange-700">View All</button>
                               </div>
                               
-                              <div className="space-y-4 overflow-y-auto max-h-[250px] pr-2 custom-scrollbar">
+                              <div className="space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
                                  {getAdminReviews().length > 0 ? getAdminReviews().map((r) => (
-                                    <div key={r.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-colors">
-                                       <div className="flex justify-between items-start mb-2">
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">{r.user_name.charAt(0)}</div>
-                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{r.user_name}</span>
+                                    <div key={r.id} className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 backdrop-blur-md border border-slate-100 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group">
+                                       <div className="flex justify-between items-start mb-3">
+                                          <div className="flex items-center gap-3">
+                                             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center text-xs font-black shadow-inner border border-white/50 dark:border-slate-700/30 text-slate-700 dark:text-slate-300">
+                                                {r.user_name.charAt(0)}
+                                             </div>
+                                             <div>
+                                                <div className="text-sm font-black text-slate-900 dark:text-white leading-tight">{r.user_name}</div>
+                                                <div className="flex items-center gap-0.5 mt-0.5">
+                                                   {Array.from({length: 5}).map((_, i) => (
+                                                      <Star key={i} size={10} className={`${i < r.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 dark:text-slate-700'}`}/>
+                                                   ))}
+                                                </div>
+                                             </div>
                                           </div>
-                                          <div className="flex text-yellow-400"><Star size={10} fill="currentColor"/> <span className="text-[10px] text-slate-400 ml-1 font-mono">{r.rating}.0</span></div>
+                                          <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm">{r.type}</span>
                                        </div>
-                                       <p className="text-xs italic text-slate-600 dark:text-slate-300 line-clamp-2">"{r.message}"</p>
-                                       <div className="mt-2 flex justify-between items-center">
-                                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full uppercase">{r.type}</span>
-                                          <span className="text-[10px] text-slate-300">{new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                       <div className="relative pt-1 pl-1">
+                                          <Quote size={24} className="absolute -top-2 -left-2 text-slate-200 dark:text-slate-700/50 z-0" />
+                                          <p className="text-sm font-medium text-slate-600 dark:text-slate-300 relative z-10 leading-relaxed italic">"{r.message}"</p>
+                                       </div>
+                                       <div className="mt-4 flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                                          <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><Clock size={12}/> {new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                          <button className="text-[10px] uppercase tracking-widest font-black text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity">Reply</button>
                                        </div>
                                     </div>
                                  )) : (
-                                   <div className="text-center py-10 text-slate-400 text-xs font-bold">No recent feedback available.</div>
+                                   <div className="flex flex-col items-center justify-center py-10 text-slate-400 opacity-60">
+                                      <MessageSquare size={32} className="mb-2" />
+                                      <div className="text-xs font-bold">No recent feedback available.</div>
+                                   </div>
                                  )}
                               </div>
                            </div>
@@ -1532,33 +1564,74 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'admin' && user.role === 'ADMIN' && (
-               <div className="max-w-md mx-auto space-y-8">
+               <div className="max-w-5xl mx-auto space-y-8">
                   <header>
-                     <h2 className="text-2xl font-black text-slate-900 dark:text-white">Manage Menu</h2>
-                     <p className="text-xs text-slate-500">Add or remove items.</p>
+                     <h2 className="text-3xl font-black text-slate-900 dark:text-white">Menu & Inventory</h2>
+                     <p className="text-sm text-slate-500 font-medium mt-1">Curate the cafeteria offerings.</p>
                   </header>
-                  <form onSubmit={handleAddMenuItem} className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                     <h3 className="font-bold text-sm dark:text-white flex items-center gap-2"><PlusCircle size={16} className="text-orange-500"/> Add New</h3>
-                     <input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900/20 dark:text-white" placeholder="Item Name" required />
-                     <div className="flex gap-3">
-                        <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold text-sm outline-none dark:text-white" placeholder="Price" required />
-                        <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value as any})} className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold text-sm outline-none dark:text-white cursor-pointer"><option value="Snacks">Snacks</option><option value="Meals">Meals</option><option value="Beverages">Drinks</option></select>
-                     </div>
-                     <button type="submit" className="w-full bg-orange-600 text-white py-3 rounded-xl font-black text-sm shadow-lg shadow-orange-100 dark:shadow-none hover:bg-orange-700 transition-all">Add Item</button>
-                  </form>
                   
-                  <div className="space-y-4">
-                     <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2"><List size={16} className="text-blue-500"/> Current Inventory</h3>
-                     <div className="grid grid-cols-1 gap-3">
-                        {menu.map(item => (
-                           <div key={item.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                              <div className="flex items-center gap-3">
-                                 <img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover" />
-                                 <div><div className="font-bold text-xs dark:text-white">{item.name}</div><div className="text-[10px] text-slate-400">₹{item.price} • {item.category}</div></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                     <div className="lg:col-span-1">
+                        <form onSubmit={handleAddMenuItem} className="sticky top-6 space-y-5 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                           <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity bg-orange-500 pointer-events-none"></div>
+                           <h3 className="font-black text-lg dark:text-white flex items-center gap-2 relative z-10"><PlusCircle size={20} className="text-orange-500"/> Add New Item</h3>
+                           
+                           <div className="space-y-4 relative z-10">
+                              <div className="relative">
+                                 <input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} id="itemName" className="peer w-full p-4 pt-6 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-500 dark:text-white transition-colors" placeholder=" " required />
+                                 <label htmlFor="itemName" className="absolute top-4 left-4 text-xs font-bold text-slate-400 peer-focus:text-[10px] peer-focus:top-1.5 peer-focus:text-orange-500 peer-placeholder-shown:text-sm peer-placeholder-shown:top-4 transition-all pointer-events-none">Item Name</label>
                               </div>
-                              <button onClick={() => handleRemoveMenuItem(item.id, item.name)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"><Trash2 size={16}/></button>
+                              
+                              <div className="flex gap-4">
+                                 <div className="relative flex-1">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                                    <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full p-4 pl-8 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-500 dark:text-white transition-colors" placeholder="Price" required />
+                                 </div>
+                                 <div className="relative flex-1">
+                                    <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value as any})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-500 dark:text-white cursor-pointer transition-colors appearance-none">
+                                       <option value="Snacks">Snacks</option>
+                                       <option value="Meals">Meals</option>
+                                       <option value="Beverages">Drinks</option>
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                       <ChevronRight size={16} className="rotate-90" />
+                                    </div>
+                                 </div>
+                              </div>
                            </div>
-                        ))}
+                           <button type="submit" className="w-full relative z-10 bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-500 text-white py-4 rounded-xl font-black text-sm shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:shadow-orange-500/40">
+                              <Plus size={18} strokeWidth={3} /> Save Item
+                           </button>
+                        </form>
+                     </div>
+                     
+                     <div className="lg:col-span-2 space-y-4">
+                        <div className="flex items-center justify-between mb-2">
+                           <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2"><List size={20} className="text-blue-500"/> Current Catalog</h3>
+                           <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full">{menu.length} Items</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                           {menu.map(item => (
+                              <div key={item.id} className="flex flex-col p-4 bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
+                                 <div className="flex items-center gap-4 mb-4">
+                                    <div className="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                                       <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                       <div className="absolute inset-0 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl pointer-events-none"></div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <h4 className="font-black text-sm dark:text-white truncate">{item.name}</h4>
+                                       <div className="flex items-center gap-2 mt-1">
+                                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/50">₹{item.price}</span>
+                                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-700/50">{item.category}</span>
+                                       </div>
+                                    </div>
+                                 </div>
+                                 <button onClick={() => handleRemoveMenuItem(item.id, item.name)} className="w-full py-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
+                                    <Trash2 size={14}/> Remove Item
+                                 </button>
+                              </div>
+                           ))}
+                        </div>
                      </div>
                   </div>
                </div>
@@ -1582,15 +1655,34 @@ const App: React.FC = () => {
          
          {user && (
            <nav className="md:hidden fixed bottom-6 left-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border border-white/20 dark:border-slate-700/50 p-2 rounded-full z-50 flex justify-between items-center shadow-2xl shadow-slate-200/50 dark:shadow-black/80 ring-1 ring-black/5 dark:ring-white/5">
-              <MobileNavItem icon={LayoutDashboard} label="Home" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-              <MobileNavItem icon={CreditCard} label="Order" active={activeTab === 'ordering'} onClick={() => setActiveTab('ordering')} />
-              <MobileNavItem icon={Camera} label="Live" active={activeTab === 'visuals'} onClick={() => setActiveTab('visuals')} />
-              <MobileNavItem icon={MessageSquare} label="Buzz" active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} />
+              <MobileNavItem icon={LayoutDashboard} label="Home" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileAdminMenuOpen(false); }} />
+              <MobileNavItem icon={CreditCard} label="Order" active={activeTab === 'ordering'} onClick={() => { setActiveTab('ordering'); setIsMobileAdminMenuOpen(false); }} />
+              <MobileNavItem icon={Camera} label="Live" active={activeTab === 'visuals'} onClick={() => { setActiveTab('visuals'); setIsMobileAdminMenuOpen(false); }} />
+              <MobileNavItem icon={MessageSquare} label="Buzz" active={activeTab === 'feedback'} onClick={() => { setActiveTab('feedback'); setIsMobileAdminMenuOpen(false); }} />
                {user.role === "ADMIN" && (
-                  <>
-                     <MobileNavItem icon={BarChart3} label="Rev" active={activeTab === "analytics"} onClick={() => setActiveTab("analytics")} />
-                     <MobileNavItem icon={Settings} label="Admin" active={activeTab === "admin"} onClick={() => setActiveTab("admin")} />
-                  </>
+                  <div className="relative flex-1 flex justify-center">
+                     <button
+                        onClick={() => setIsMobileAdminMenuOpen(!isMobileAdminMenuOpen)}
+                        className={`relative flex items-center justify-center h-12 rounded-full transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${activeTab === 'analytics' || activeTab === 'admin' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/40 w-[35%] mx-1' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 bg-transparent w-12'}`}
+                     >
+                        <Settings size={activeTab === 'analytics' || activeTab === 'admin' ? 20 : 24} strokeWidth={activeTab === 'analytics' || activeTab === 'admin' ? 2.5 : 2} className="relative z-10 shrink-0" />
+                        {(activeTab === 'analytics' || activeTab === 'admin') && (
+                          <span className="ml-2 text-[10px] font-black uppercase tracking-widest whitespace-nowrap overflow-hidden animate-fade-in">Admin</span>
+                        )}
+                     </button>
+                     {/* Floating Admin Menu */}
+                     {isMobileAdminMenuOpen && (
+                        <div className="absolute bottom-16 right-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl p-2 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 flex flex-col gap-2 animate-bounce-in min-w-[140px] origin-bottom-right">
+                           <button onClick={() => { setActiveTab('analytics'); setIsMobileAdminMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'analytics' ? 'bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                              <BarChart3 size={18}/> Revenue
+                           </button>
+                           <button onClick={() => { setActiveTab('admin'); setIsMobileAdminMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'admin' ? 'bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                              <Settings size={18}/> Manage Menu
+                           </button>
+                           <div className="absolute -bottom-2 right-5 w-4 h-4 bg-white dark:bg-slate-800 rotate-45 border-r border-b border-slate-200/50 dark:border-slate-700/50"></div>
+                        </div>
+                     )}
+                  </div>
                )}
            </nav>
          )}
@@ -1861,9 +1953,10 @@ const App: React.FC = () => {
 
 // --- Sub-components ---
 const NavItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
-  <button onClick={onClick} className={`flex items-center gap-4 p-4 rounded-2xl font-bold transition-all text-sm w-full text-left ${active ? 'bg-orange-600 text-white shadow-lg shadow-orange-100 dark:shadow-none' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-    <Icon size={20} strokeWidth={active ? 3 : 2} />
-    <span>{label}</span>
+  <button onClick={onClick} className={`relative flex items-center gap-4 p-4 rounded-2xl font-bold transition-all duration-300 ease-out text-sm w-full text-left overflow-hidden group ${active ? 'bg-gradient-to-r from-orange-50 to-orange-100/50 dark:from-orange-900/20 dark:to-orange-900/5 text-orange-600 dark:text-orange-400 shadow-sm border border-orange-100 dark:border-orange-900/30' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent'}`}>
+    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-2/3 w-1.5 bg-orange-500 rounded-r-full shadow-[0_0_12px_rgba(249,115,22,0.8)]"></div>}
+    <Icon size={20} strokeWidth={active ? 2.5 : 2} className={`relative z-10 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
+    <span className="relative z-10 tracking-wide">{label}</span>
   </button>
 );
 

@@ -1,0 +1,704 @@
+================================================================================
+               SMART ANNA - INTELLIGENT CAFETERIA SYSTEM
+                       Complete Project Details
+================================================================================
+
+                        PROJECT OVERVIEW
+================================================================================
+
+Project Name    : Smart Anna - Intelligent Cafeteria
+Project Type    : Full-Stack Web Application (Hybrid IoT + Cloud)
+Institution     : UPL University - BE 8 Project Team
+Year            : 2026
+Tagline         : "Swift. Smart. Satisfying."
+Subtitle        : "Intelligence at your service"
+
+Description:
+Smart Anna is a next-generation, AI-powered cafeteria management dashboard
+that combines real-time IoT sensor simulation with a modern digital ordering
+platform. It is designed to optimize cafeteria operations, reduce
+overcrowding, and enhance the user experience for both students and
+administrators. The system bridges the gap between physical hardware
+(sensors, cameras) and digital services (cloud menu, ordering, analytics).
+
+
+================================================================================
+                        CONTEXT & MOTIVATION
+================================================================================
+
+Problem Statement:
+  - College cafeterias face issues like overcrowding, long wait times,
+    no visibility into seat availability, and manual order management.
+  - Students have no way to check crowd levels before walking to the canteen.
+  - Administrators lack data-driven insights into revenue, popular items,
+    and peak hours.
+
+Solution:
+  Smart Anna addresses all these by providing:
+  1. Real-time crowd monitoring (people count, density status)
+  2. Table availability tracking (IoT sensor simulation)
+  3. Digital food ordering with UPI payment simulation
+  4. Feedback & review system for continuous improvement
+  5. Admin analytics dashboard for revenue, sales, and occupancy trends
+  6. CCTV-style live camera feed integration (under development)
+
+Target Users:
+  - Students (primary users) — browse menu, order food, check crowd status
+  - Cafeteria Administrators — manage menu, view analytics, monitor feeds
+
+
+================================================================================
+                       TECHNOLOGY STACK
+================================================================================
+
+FRONTEND:
+  - Framework       : React 18.2 (with TypeScript)
+  - Build Tool      : Vite 7.3
+  - Styling         : Tailwind CSS 3.4 (via CDN in index.html)
+  - Icons           : Lucide React (60+ icons used)
+  - Font            : Google Fonts - Inter (weights: 300-900)
+  - State Mgmt      : React useState + useEffect hooks (no Redux)
+  - Charts          : Custom SVG chart components (no chart library)
+                      - Line Chart (revenue trends)
+                      - Doughnut/Pie Chart (sales mix)
+                      - Bar Chart (occupancy trends)
+                      - Smooth Trend Chart (live occupancy)
+
+BACKEND (Python):
+  - Framework       : FastAPI 0.109.0
+  - Server          : Uvicorn 0.27.0
+  - ORM             : SQLAlchemy 2.0.25
+  - Validation      : Pydantic 2.6.0
+  - Database        : SQLite (local file: cafeteria.db)
+  - CORS            : Enabled for all origins (development mode)
+
+CLOUD DATABASE:
+  - Platform        : Supabase (PostgreSQL hosted)
+  - Client Library  : @supabase/supabase-js 2.98.0
+  - Authentication  : Supabase Auth (signInWithPassword)
+  - Tables          : menu_items, orders, feedback
+
+DEPLOYMENT:
+  - Frontend Host   : Vercel (recommended)
+  - Backend Host    : Localhost (or Render/Railway for production)
+  - Build Command   : npm run build (via Vite)
+  - Output Dir      : dist/
+
+
+================================================================================
+                        PROJECT STRUCTURE
+================================================================================
+
+root/
+├── App.tsx                  # Main application (1884 lines) - ALL views & logic
+├── index.tsx                # React entry point (mounts <App />)
+├── index.html               # HTML shell + ALL CSS styles (839 lines)
+├── types.ts                 # TypeScript interfaces & enums
+├── constants.ts             # Menu items data (20 items) + config constants
+├── vite.config.ts           # Vite build configuration
+├── tsconfig.json            # TypeScript configuration
+├── package.json             # Dependencies & scripts
+├── metadata.json            # App metadata (name, description)
+├── .env                     # Supabase credentials (URL + Anon Key)
+├── README.md                # Deployment guide & documentation
+│
+├── services/
+│   └── apiService.ts        # API service layer (519 lines)
+│                              - Supabase DB operations
+│                              - Python backend API calls
+│                              - Mock/fallback data generators
+│                              - Authentication logic
+│
+├── src/
+│   └── lib/
+│       └── supabase.ts      # Supabase client initialization
+│
+├── backend/
+│   ├── server.py            # FastAPI backend server (239 lines)
+│   └── requirements.txt     # Python dependencies
+│
+├── public/
+│   ├── app_logo.jpg         # Custom app logo
+│   └── favicon.jpeg         # Browser favicon
+│
+└── dist/                    # Production build output
+
+
+================================================================================
+                        DATABASE SCHEMA
+================================================================================
+
+The app uses TWO database systems simultaneously:
+
+----- 1. SUPABASE (PostgreSQL - Cloud, Primary) -----
+
+Table: menu_items
+  ┌──────────────┬──────────────┬──────────────────────────────────┐
+  │ Column       │ Type         │ Description                      │
+  ├──────────────┼──────────────┼──────────────────────────────────┤
+  │ id           │ UUID (PK)    │ Auto-generated unique ID         │
+  │ name         │ TEXT         │ Item name (e.g., "Masala Dosa")  │
+  │ price        │ NUMERIC      │ Price in INR (e.g., 70)          │
+  │ category     │ TEXT         │ "Snacks" / "Meals" / "Beverages" │
+  │ image_url    │ TEXT         │ Unsplash image URL               │
+  │ created_at   │ TIMESTAMPTZ  │ Auto timestamp (UTC)             │
+  └──────────────┴──────────────┴──────────────────────────────────┘
+
+Table: orders
+  ┌──────────────┬──────────────┬──────────────────────────────────┐
+  │ Column       │ Type         │ Description                      │
+  ├──────────────┼──────────────┼──────────────────────────────────┤
+  │ id           │ UUID (PK)    │ Auto-generated unique ID         │
+  │ user_email   │ TEXT         │ Student/user email               │
+  │ total        │ NUMERIC      │ Order total in INR               │
+  │ items        │ JSONB        │ Cart items array (JSON)          │
+  │ payment_method│ TEXT        │ "UPI" (default)                  │
+  │ status       │ TEXT         │ Default: "pending"               │
+  │ created_at   │ TIMESTAMPTZ  │ Auto timestamp (UTC)             │
+  └──────────────┴──────────────┴──────────────────────────────────┘
+
+Table: feedback
+  ┌──────────────┬──────────────┬──────────────────────────────────┐
+  │ Column       │ Type         │ Description                      │
+  ├──────────────┼──────────────┼──────────────────────────────────┤
+  │ id           │ UUID (PK)    │ Auto-generated unique ID         │
+  │ user_name    │ TEXT         │ Name derived from email          │
+  │ user_email   │ TEXT         │ Student/user email               │
+  │ rating       │ INTEGER      │ 1 to 5 star rating               │
+  │ message      │ TEXT         │ Feedback text                    │
+  │ type         │ TEXT         │ Category (Food Quality, etc.)    │
+  │ created_at   │ TIMESTAMPTZ  │ Auto timestamp (UTC)             │
+  └──────────────┴──────────────┴──────────────────────────────────┘
+
+SQL to create these tables (run in Supabase SQL Editor):
+
+  CREATE TABLE menu_items (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    price NUMERIC NOT NULL,
+    category TEXT NOT NULL,
+    image_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+  );
+
+  CREATE TABLE orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_email TEXT,
+    total NUMERIC NOT NULL,
+    items JSONB NOT NULL,
+    payment_method TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+  );
+
+  CREATE TABLE feedback (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_name TEXT,
+    user_email TEXT,
+    rating INTEGER NOT NULL,
+    message TEXT,
+    type TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+  );
+
+
+----- 2. SQLite (Local, Python Backend Only) -----
+
+Used by the FastAPI backend (backend/server.py) for local development.
+File: cafeteria.db (auto-created on first run)
+
+Has similar tables: menu_items, orders, feedback
+These are defined via SQLAlchemy ORM models (DBMenuItem, DBOrder, DBFeedback).
+This is a SEPARATE database from Supabase — the frontend talks to Supabase
+directly, while the Python backend uses its own SQLite for API endpoints.
+
+
+================================================================================
+                     AUTHENTICATION SYSTEM
+================================================================================
+
+The app has TWO user roles with different login flows:
+
+1. STUDENT LOGIN (Guest Mode):
+   - Input: Email address ending in "@upl" (e.g., rahul@upl)
+   - No password required
+   - Validation: Must contain "@upl" domain
+   - Creates a session-only user object (no DB persistence)
+   - User gets: id (timestamp-based), name (from email prefix), role: "STUDENT"
+   - Access: Dashboard, Order Food, Feedback, Live Feeds
+
+2. ADMIN LOGIN (Authenticated):
+   - Input: Username + Password
+   - Primary: Supabase Auth (signInWithPassword)
+   - Fallback: Hardcoded credentials → username: "admin", password: "admin123"
+   - User gets: id (from Supabase or "admin-local"), role: "ADMIN"
+   - Access: Everything Student has + Analytics Dashboard + Menu Management
+
+Password Visibility Toggle:
+   - Eye/EyeOff icon on admin password field
+   - Toggles between password and text input type
+
+
+================================================================================
+                       FEATURES IN DETAIL
+================================================================================
+
+----- FEATURE 1: LIVE DASHBOARD (All Users) -----
+  Tab: "Dashboard"
+  - Shows real-time cafeteria status
+  - 4 Status Cards:
+    • People Inside (count from API)
+    • Density Level (FREE / MODERATE / CROWDED)
+    • Free Tables (out of 60 total)
+    • Advice (GO NOW or WAIT based on crowd)
+  - Interactive Floor Map:
+    • 60 table grid with color-coded status
+    • Green = Free, Orange = Partial, Red = Full
+    • Each table shows 5 dot indicators for seat occupancy
+    • Table capacity: 5 students per table
+  - Occupancy Trend Chart (SVG smooth line chart)
+  - Real-Time Sensor Data Panel:
+    • Shows data source: "IOT SENSORS" or "AI CROWD ESTIMATION"
+    • Total capacity, occupancy rate bar, available tables
+  - Live Clock Widget (shows current time, date, AM/PM with sun/moon icon)
+  - Auto-refreshes every 3 seconds (POLL_INTERVAL = 3000ms)
+
+----- FEATURE 2: FOOD ORDERING SYSTEM (All Users) -----
+  Tab: "Order Food"
+  - Full digital menu with 20 items across 3 categories:
+    • Snacks (7 items): Samosa, Vada Pav, Veg Puff, Bread Pakora, etc.
+    • Meals (8 items): Masala Dosa, Idli Sambar, Veg Thali, Chole Bhature, etc.
+    • Beverages (5 items): Masala Chai, Filter Coffee, Sweet Lassi, etc.
+  - Price range: ₹15 (Masala Chai) to ₹120 (Veg Thali Deluxe)
+  - Features:
+    • Search bar to filter items by name
+    • Category filter buttons (All / Snacks / Meals / Beverages)
+    • 3D flip card UI for each menu item (hover to see back)
+    • Quick "ADD" button on each card (no need to flip)
+    • Cart sidebar (desktop) / Bottom sheet modal (mobile)
+    • Quantity control (+/- buttons)
+    • Order confirmation modal with item review
+  - Payment Flow:
+    1. User clicks "Pay with UPI"
+    2. Confirmation modal shows order summary & total
+    3. UPI modal shows QR code (generated via qrserver.com API)
+    4. Custom "Card Slot" payment processing animation plays
+    5. Order saved to Supabase "orders" table
+    6. Receipt shown with 2-minute countdown timer
+    7. Receipt says "Show to Counter Staff"
+  - Order History: View past orders (fetched from Supabase by email)
+
+----- FEATURE 3: FEEDBACK & REVIEWS (All Users) -----
+  Tab: "Feedback" (labeled "Community Buzz")
+  - Submit Feedback Form:
+    • Category selector: Food Quality, Cleanliness, Seating,
+      Staff Behavior, Ambiance, Overall
+    • 5-star rating (interactive star buttons)
+    • Text message area
+  - Feedback Display:
+    • "Today's Highlights" — top-rated reviews from today
+    • "Recent Feed" — chronologically sorted reviews
+    • Each review card shows: avatar, name, type, rating, timestamp, message
+  - Data stored in Supabase "feedback" table
+  - Falls back to mock reviews if Supabase is offline
+
+----- FEATURE 4: LIVE CAMERA FEEDS (All Users) -----
+  Tab: "Live Feeds"
+  - Marked as "UNDER DEVELOPMENT" (orange pulsing badge)
+  - Shows camera feed grid (images from Unsplash as placeholders)
+  - Each feed card shows: camera name, location, LIVE/OFFLINE status
+  - Default feeds: Main Entrance, Dining Area (from Python API or mock)
+  - Admin can see "Connect New Feed" placeholder button
+  - Refresh button to reload feeds
+  - Real-time timestamp overlay
+
+----- FEATURE 5: ADMIN ANALYTICS DASHBOARD (Admin Only) -----
+  Tab: "Revenue" (analytics)
+  - Timeframe selector: Daily / Weekly / Monthly
+  - 4 Summary Cards: Total Revenue, Avg Rating, Active Tables, Top Seller
+  - Revenue Trend Line Chart (SVG)
+  - Sales Mix Doughnut/Pie Chart (Meals/Snacks/Beverages)
+  - Peak Occupancy Bar Chart
+  - Live Customer Voice section (latest 5 reviews inline)
+  - Analytics calculated from real Supabase order data when available
+  - Falls back to realistic mock data (with multipliers for timeframes)
+
+----- FEATURE 6: MENU MANAGEMENT (Admin Only) -----
+  Tab: "Manage Menu"
+  - Add New Item form: Name, Price, Category dropdown
+  - Current Inventory list with image, name, price, category
+  - Delete item button (with confirmation dialog)
+  - Optimistic UI updates (instant feedback, reverts on failure)
+  - CRUD operations go to Supabase "menu_items" table
+
+----- FEATURE 7: MOBILE-FIRST EXPERIENCE -----
+  - Responsive design (Mobile / Tablet / Desktop)
+  - Mobile bottom navigation bar (pill-style, animated)
+  - Mobile cart as bottom sheet overlay
+  - "Today's Highlight" recommendation popup (mobile only)
+    • Shows most popular item from analytics
+    • Quick "Order Now" button
+  - Floating "View Cart" bar when items are in cart
+
+
+================================================================================
+                     APPLICATION WORKFLOW
+================================================================================
+
+----- USER FLOW: STUDENT -----
+
+  1. Open App → Login Screen appears
+  2. Select "Student" tab
+  3. Enter college email (e.g., rahul@upl) → Click "Access Portal"
+  4. → Dashboard loads with live status, tables, occupancy chart
+  5. Navigate to "Order Food" tab
+  6. Browse/search menu → Add items to cart
+  7. Open cart → Review items → Click "Pay with UPI"
+  8. Confirmation modal → Confirm order
+  9. UPI QR code modal appears → Click "Pay with UPI App"
+  10. Payment processing animation plays (1.5 seconds)
+  11. Receipt displayed (valid for 2 minutes)
+  12. → Can view order history via History button
+  13. Navigate to "Feedback" → Submit a review with rating
+  14. Navigate to "Live Feeds" → View camera feeds
+  15. Toggle dark/light theme anytime
+  16. Sign out via sidebar or header button
+
+----- USER FLOW: ADMIN -----
+
+  1. Open App → Login Screen appears
+  2. Select "Admin" tab
+  3. Enter username "admin" + password "admin123" → Click "Access Portal"
+  4. → Dashboard loads (same as student view)
+  5. Navigate to "Revenue" → View analytics with charts
+  6. Switch timeframes (Daily/Weekly/Monthly) to see different data
+  7. Navigate to "Manage Menu" → Add new items or delete existing
+  8. Navigate to "Live Feeds" → View cameras + "Connect New Feed" option
+  9. All student features also available
+
+
+================================================================================
+                   DATA FLOW & API ARCHITECTURE
+================================================================================
+
+The app has TWO data sources that work independently:
+
+┌───────────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (React/Vite)                         │
+│                              App.tsx                                 │
+│                                │                                     │
+│                     ┌──────────┴──────────┐                         │
+│                     │   apiService.ts     │                         │
+│                     │  (Service Layer)    │                         │
+│                     └──────┬──────┬───────┘                         │
+│                            │      │                                  │
+│              ┌─────────────┘      └──────────────┐                  │
+│              ▼                                    ▼                  │
+│   ┌─────────────────────┐            ┌──────────────────────┐       │
+│   │  Python Backend     │            │   Supabase (Cloud)    │       │
+│   │  (localhost:5000)   │            │   PostgreSQL + Auth   │       │
+│   │                     │            │                       │       │
+│   │  Endpoints:         │            │  Tables:              │       │
+│   │  GET /status        │            │  - menu_items         │       │
+│   │  GET /api/tables    │            │  - orders             │       │
+│   │  GET /cameras       │            │  - feedback           │       │
+│   │                     │            │                       │       │
+│   │  Used for:          │            │  Used for:            │       │
+│   │  - Crowd count      │            │  - Menu CRUD          │       │
+│   │  - Table occupancy  │            │  - Order placement    │       │
+│   │  - Camera feeds     │            │  - Order history      │       │
+│   │                     │            │  - Feedback submit    │       │
+│   │  (Simulates IoT)    │            │  - Analytics calc     │       │
+│   └─────────────────────┘            │  - Admin auth         │       │
+│                                      └──────────────────────┘       │
+└───────────────────────────────────────────────────────────────────────┘
+
+FALLBACK / RESILIENCE SYSTEM:
+  If Python backend is offline:
+    → /status returns mock random people count (5-40)
+    → /api/tables estimates tables from crowd: ceil(people / 5)
+    → /cameras returns placeholder Unsplash images as OFFLINE feeds
+    → User sees notification: "Python API Offline: Falling back to..."
+
+  If Supabase is offline:
+    → Menu falls back to INITIAL_MENU constant (20 hardcoded items)
+    → Feedback falls back to MOCK_FEEDBACK_STORE (4 preset reviews)
+    → Analytics falls back to getMockAnalytics() (realistic fake data)
+    → User sees notification with error message
+
+
+================================================================================
+              PYTHON BACKEND API ENDPOINTS (server.py)
+================================================================================
+
+Base URL: http://localhost:5000
+
+  GET  /              → Health check ("Smart Anna Backend is Running")
+  GET  /status        → Simulates CV people counting
+                        Returns: { people_inside: N, status: FREE|MODERATE|CROWDED }
+  GET  /api/tables    → Simulates IoT table sensors
+                        Returns: { occupied_tables: N, empty_tables: N }
+  GET  /cameras       → Returns camera feed data
+                        Returns: Array of { id, name, url, status, location }
+  GET  /menu          → Get all menu items (seeds DB if empty)
+  POST /menu          → Add new menu item (auto-generates UUID)
+  DELETE /menu/{id}   → Remove a menu item by ID
+  POST /orders        → Create a new order (stores items as JSON)
+  GET  /orders/{email}→ Get order history for a specific user email
+  POST /feedback      → Submit feedback (rating + message)
+  GET  /feedback      → Get all feedback (newest first)
+  GET  /analytics/summary → Get analytics data (revenue, item sales, etc.)
+                            Query param: ?timeframe=daily|weekly|monthly
+
+
+================================================================================
+                  ENVIRONMENT VARIABLES (.env)
+================================================================================
+
+  VITE_SUPABASE_URL       = https://lobghkggwkygogzmfnlk.supabase.co/
+  VITE_SUPABASE_ANON_KEY  = eyJhbGciOiJIUzI1NiIs... (JWT token)
+
+These are loaded at build time by Vite (import.meta.env) and used by
+the Supabase client in src/lib/supabase.ts.
+
+
+================================================================================
+                    UI/UX DESIGN HIGHLIGHTS
+================================================================================
+
+Theme System:
+  - Dark mode (default) + Light mode toggle
+  - Beautiful animated day/night toggle switch (sun ↔ moon with stars)
+  - Theme persists via CSS class on <html> element
+
+Design Language:
+  - Modern glassmorphism (backdrop-blur overlays)
+  - Rounded corners (up to 2.5rem border-radius)
+  - Gradient accents (orange-to-red for CTAs)
+  - Animated login card with green-to-blue gradient border
+  - Skeleton loading states for all data sections
+  - Micro-animations: hover scales, bounce-in modals, shake on error
+
+Custom CSS Components (in index.html):
+  1. Clock Card — Dark gradient card showing time + day
+  2. Auth Card — Gradient-bordered login card
+  3. Day/Night Toggle — Animated toggle with moon dots, stars, light rays
+  4. 3D Flip Cards — Menu item cards that flip on hover
+  5. Payment Loader — Card-slot machine animation during payment
+  6. Custom Scrollbar — Themed for dark and light mode
+
+Navigation:
+  - Desktop: Fixed left sidebar (272px) with logo, nav items, theme toggle
+  - Mobile: Floating bottom pill-navigation bar with animated active state
+
+Charts (all custom SVG, no libraries):
+  - SmoothTrendChart: Live occupancy with cyan gradient fill
+  - SimpleLineChart: Revenue trend with orange gradient
+  - SimpleDoughnutChart: Category sales pie chart
+  - SimpleBarChart: Occupancy bar chart with blue bars
+
+
+================================================================================
+                    HOW TO RUN LOCALLY
+================================================================================
+
+Prerequisites:
+  - Node.js (v18+)
+  - Python 3.8+
+  - npm
+
+Step 1: Start Python Backend
+  > cd backend
+  > pip install -r requirements.txt
+  > python server.py
+  → Runs on http://localhost:5000
+
+Step 2: Configure Supabase
+  - Create .env file in root with your Supabase credentials
+  - Run SQL queries in Supabase dashboard to create tables (see above)
+
+Step 3: Start Frontend
+  > npm install
+  > npm run dev
+  → Runs on http://localhost:5173 (Vite default)
+
+Step 4: Access the App
+  - Student: Enter any email ending in @upl (e.g., test@upl)
+  - Admin: Username "admin", Password "admin123"
+
+
+================================================================================
+                    DEPLOYMENT (PRODUCTION)
+================================================================================
+
+Frontend → Vercel:
+  1. Push code to GitHub
+  2. Import repo on Vercel.com
+  3. Select Vite as framework preset
+  4. Set build command: npm run build
+  5. Set output directory: dist
+  6. Add environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+  7. Deploy → Live URL generated
+
+Backend → Render/Railway (optional):
+  - Deploy server.py to a cloud Python hosting service
+  - Update PYTHON_API_URL in apiService.ts with the deployed URL
+  - Without this, the app uses fallback/mock data for IoT features
+
+Note: The frontend works WITHOUT the Python backend.
+The IoT features (crowd count, tables, cameras) will show
+simulated/estimated data when the backend is unavailable.
+
+
+================================================================================
+                    KEY CONFIGURATION VALUES
+================================================================================
+
+  TOTAL_TABLES      = 60      (total tables in cafeteria)
+  TABLE_CAPACITY    = 5       (students per table)
+  API_BASE_URL      = http://localhost:5000
+  POLL_INTERVAL     = 3000ms  (dashboard refresh rate)
+  RECEIPT_TIMER     = 120 sec (receipt auto-close)
+  PYTHON_API_URL    = http://{hostname}:5000 (auto-detected)
+
+
+================================================================================
+                    MENU ITEMS (20 Total)
+================================================================================
+
+SNACKS (7 items):
+  1. Samosa (2pcs)     — ₹30
+  2. Vada Pav          — ₹25
+  3. Veg Puff          — ₹20
+  4. Bread Pakora      — ₹25
+  5. Masala Fries      — ₹60
+  6. Paneer Roll       — ₹80
+  7. Veg Sandwich      — ₹50
+
+MEALS (8 items):
+  8.  Masala Dosa       — ₹70
+  9.  Idli Sambar (3pcs)— ₹50
+  10. Veg Thali Deluxe  — ₹120
+  11. Chole Bhature     — ₹90
+  12. Pav Bhaji         — ₹80
+  13. Veg Biryani       — ₹110
+  14. Hakka Noodles     — ₹90
+  15. Aloo Paratha      — ₹60
+
+BEVERAGES (5 items):
+  16. Masala Chai       — ₹15
+  17. Filter Coffee     — ₹20
+  18. Sweet Lassi       — ₹50
+  19. Cold Coffee       — ₹60
+  20. Soft Drink (Cola) — ₹40
+
+
+================================================================================
+                 FEEDBACK CATEGORIES
+================================================================================
+
+  1. Food Quality
+  2. Cleanliness
+  3. Seating
+  4. Staff Behavior
+  5. Ambiance
+  6. Overall
+
+
+================================================================================
+               SECURITY & ERROR HANDLING
+================================================================================
+
+Authentication:
+  - Student: Email validation (must contain @upl)
+  - Admin: Supabase Auth with hardcoded fallback
+  - No session persistence (state resets on page refresh)
+  - Password visibility toggle for admin login
+
+Error Handling:
+  - Global error callback system (registerGlobalErrorCallback)
+  - Toast notifications for all API errors
+  - Graceful fallbacks to mock data on failure
+  - Console warnings with "DEBUG:" prefix for troubleshooting
+  - Optimistic UI updates with rollback on failure
+  - Try/catch around all async operations
+
+CORS:
+  - Backend allows all origins (development configuration)
+  - Supabase RLS policies may affect data access
+
+
+================================================================================
+            LATEST UPDATES (March 2026)
+================================================================================
+
+  1. Smart Demo Mode — App falls back gracefully if DB/API is offline
+  2. Password Visibility Toggle — Eye icon on admin password field
+  3. New Branding — Custom character logo + "Swift. Smart. Satisfying."
+  4. Under Development Badge — Live Feeds marked as WIP
+  5. Fixed Menu Loading — Synced with Supabase cloud database
+  6. Custom Payment Animation — Card-slot machine loader during payment
+  7. Order Confirmation Flow — Review modal before UPI payment
+  8. Mobile Recommendation — Popup suggesting popular item on login
+  9. Live Analytics Dashboard — Admin revenue metrics fully wired to Supabase db
+  10. System Resilience — Math guards added to dashboard to prevent React crashes
+
+
+================================================================================
+          PRESENTATION TALKING POINTS
+================================================================================
+
+1. HYBRID ARCHITECTURE:
+   "Our system uniquely combines two backends — a local Python server
+   simulating IoT sensors and a Supabase cloud database for persistent
+   data. This demonstrates how real hardware can integrate with cloud
+   services."
+
+2. RESILIENCE:
+   "The app never crashes. If the database goes down, it falls back to
+   demo data. If the Python sensor server is offline, it uses AI-based
+   estimation instead. The user always sees a working interface."
+
+3. REAL-TIME:
+   "The dashboard refreshes every 3 seconds, pulling live crowd data.
+   The floor map updates dynamically, showing which tables are free,
+   partially occupied, or full."
+
+4. MODERN UI/UX:
+   "We used custom SVG charts instead of heavy libraries, 3D flip cards
+   for the menu, a custom payment animation, dark/light mode, and a
+   mobile-first design with bottom sheet navigation."
+
+5. FULL STACK:
+   "TypeScript frontend, Python backend, PostgreSQL database, Supabase
+   auth, REST APIs, CORS middleware — this project covers the full
+   stack of modern web development."
+
+6. SCALABILITY:
+   "The Supabase cloud database can scale to production workloads.
+   The Python backend can be deployed to Render or Railway. The frontend
+   is deployed on Vercel with CDN."
+
+
+================================================================================
+                      FILE LINE COUNTS
+================================================================================
+
+  App.tsx           : 1,977 lines  (main application)
+  index.html        :   839 lines  (HTML + all CSS styles)
+  apiService.ts     :   514 lines  (API service layer)
+  constants.ts      :   156 lines  (menu data + config)
+  server.py         :   239 lines  (Python FastAPI backend)
+  types.ts          :    74 lines  (TypeScript interfaces)
+  README.md         :   178 lines  (documentation)
+  index.tsx         :    15 lines  (entry point)
+  supabase.ts       :     7 lines  (client setup)
+  package.json      :    29 lines  (dependencies)
+
+  TOTAL             : ~3,940 lines of code
+
+
+================================================================================
+                     END OF DOCUMENT
+  © 2026 • UPL University — BE 8 Project Team • Smart Anna
+================================================================================

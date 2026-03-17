@@ -1,0 +1,12 @@
+Starting Supabase Table Verification...
+--- Testing menu_items ---
+[✅ PASS] Table: menu_items | Action: SELECT (5 items found)
+
+--- Testing orders ---
+[✅ PASS] Table: orders | Action: INSERT 
+[✅ PASS] Table: orders | Action: SELECT (Successfully fetched the inserted row)
+
+--- Testing feedback ---
+[❌ FAIL] Table: feedback | Action: INSERT (Status: 400, {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'user_name' column of 'feedback' in the schema cache"})
+
+Verification Complete.

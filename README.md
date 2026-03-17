@@ -170,6 +170,7 @@ We have recently upgraded **Smart Anna** with several "smart" features to make i
 3.  **🎨 New Iconic Branding**: We’ve updated the app with a bold new character logo, a catchy tagline (*"Swift. Smart. Satisfying."*), and official credits for **UPL University**.
 4.  **🚧 Transparency on Features**: Features like "Live Feeds" are now clearly marked as **UNDER DEVELOPMENT**. This lets users know we are still perfecting the AI vision parts of the system.
 5.  **🍱 Fixed Menu Loading**: We solved a bug where the food menu was showing up blank. It is now perfectly synced with your Supabase cloud database.
+6.  **📊 Live Analytics & Revenue Dashboard**: The Admin Revenue Dashboard is now fully wired up to real-time order and feedback data via Supabase. Orders reflect instantly in the system and charts are rock-solid, gracefully handling instances where there is zero activity without crashing.
 
 ---
 © 2026 • All Rights Reserved to UPL University - BE 8 Project Team 

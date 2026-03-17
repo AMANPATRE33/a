@@ -191,12 +191,13 @@ export const createOrder = async (order: Receipt & { user_email: string, user_na
   const { error } = await supabase
     .from('orders')
     .insert([{
-      id: order.id,
+      // Removed id because DB uses gen_random_uuid() and expects UUID, our frontend use string
       user_email: order.user_email,
-      user_name: order.user_name,
+      // Removed user_name because it does not exist in the user's orders table
       items: order.items,
       total: order.total,
       payment_method: order.paymentMethod || 'UPI',
+      status: 'completed',
       created_at: new Date().toISOString()
     }]);
 
@@ -247,6 +248,7 @@ export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timest
   const { error } = await supabase
     .from('feedback')
     .insert([{
+      user_name: feedback.user_name,
       user_email: feedback.user_email,
       rating: feedback.rating,
       message: feedback.message,
@@ -305,30 +307,27 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
       throw new Error("DB Error");
     }
 
-    // If no data in DB, return Mock Analytics so the dashboard isn't empty
-    if ((!orders || orders.length === 0) && (!feedback || feedback.length === 0)) {
-      return getMockAnalytics(timeframe);
-    }
+    // Initialize with real 0s if DB is empty instead of forcing mock data
+    const safeOrders = orders || [];
+    const safeFeedback = feedback || [];
 
     // Calculate Total Revenue
-    const totalRevenue = orders ? orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0) : 0;
+    const totalRevenue = safeOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);
 
     // Calculate Avg Rating
-    const avgRating = feedback && feedback.length > 0
-      ? feedback.reduce((sum: number, f: any) => sum + (f.rating || 0), 0) / feedback.length
+    const avgRating = safeFeedback.length > 0
+      ? safeFeedback.reduce((sum: number, f: any) => sum + (f.rating || 0), 0) / safeFeedback.length
       : 0;
 
     // Calculate Item Sales
     const itemCounts: Record<string, number> = {};
-    if (orders) {
-      orders.forEach((order: any) => {
-        if (Array.isArray(order.items)) {
-          order.items.forEach((item: any) => {
-            itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 1);
-          });
-        }
-      });
-    }
+    safeOrders.forEach((order: any) => {
+      if (Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 1);
+        });
+      }
+    });
 
     const itemSales = Object.entries(itemCounts)
       .map(([name, value]) => ({ name, value }))
@@ -337,16 +336,14 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
 
     // Calculate Category Split
     const categoryCounts: Record<string, number> = {};
-    if (orders) {
-      orders.forEach((order: any) => {
-        if (Array.isArray(order.items)) {
-          order.items.forEach((item: any) => {
-            const cat = item.category || 'Other';
-            categoryCounts[cat] = (categoryCounts[cat] || 0) + (item.quantity || 1);
-          });
-        }
-      });
-    }
+    safeOrders.forEach((order: any) => {
+      if (Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const cat = item.category || 'Other';
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + (item.quantity || 1);
+        });
+      }
+    });
 
     const totalItems = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
     const categorySplit = totalItems > 0 
