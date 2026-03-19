@@ -77,7 +77,9 @@ import {
   addMenuItemToDB, 
   deleteMenuItemFromDB, 
   registerGlobalErrorCallback, 
-  fetchReviews 
+  fetchReviews,
+  updateOrderStatus,
+  createPayment
 } from './services/apiService';
 import { 
   CafeteriaStatus, 
@@ -89,7 +91,8 @@ import {
   User, 
   AnalyticsData, 
   CameraFeed, 
-  Feedback 
+  Feedback,
+  PaymentStatus
 } from './types';
 import { TOTAL_TABLES, TABLE_CAPACITY, POLL_INTERVAL } from './constants';
 
@@ -362,6 +365,8 @@ const App: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false); // NEW: Confirmation state
   const [showUpiModal, setShowUpiModal] = useState(false); // NEW: UPI Modal state
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [receiptTimer, setReceiptTimer] = useState(120);
   const [notification, setNotification] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -701,47 +706,66 @@ const App: React.FC = () => {
   const handlePayment = async (method: string, skipModal: boolean = false) => {
     if (cart.length === 0 || !user) return;
     
+    const totalAmount = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+
     if (method === 'UPI' && !skipModal) {
-      setShowUpiModal(true);
+      setIsProcessingPayment(true);
+      const tempId = `RC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const orderId = await createOrder({
+        id: tempId,
+        items: [...cart],
+        total: totalAmount,
+        timestamp: Date.now(),
+        paymentMethod: 'UPI',
+        status: 'pending',
+        user_email: user.email,
+        user_name: user.name
+      });
+      
+      setIsProcessingPayment(false);
+      
+      if (orderId) {
+        setActiveOrderId(orderId);
+        setPaymentStatus('pending');
+        setShowUpiModal(true);
+      } else {
+        showNotification("Failed to initialize payment. Try again.");
+      }
       return;
     }
     
     setShowUpiModal(false);
     setIsProcessingPayment(true);
     
-    const totalAmount = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
     const success = await processPaymentMock(totalAmount, method);
     
     if (success) {
-      const receiptId = `RC-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newOrder = {
+      if (activeOrderId) {
+        await updateOrderStatus(activeOrderId, 'paid');
+        await createPayment({
+          order_id: activeOrderId,
+          amount: totalAmount,
+          payment_method: method,
+          transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+          status: 'paid'
+        });
+      }
+      
+      const receiptId = activeOrderId || `RC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newOrder: Receipt = {
         id: receiptId,
-        user_id: user.id,
-        user_email: user.email,
-        user_name: user.name,
         items: [...cart],
         total: totalAmount,
         timestamp: Date.now(),
-        paymentMethod: method
+        paymentMethod: method,
+        status: 'paid'
       };
 
-      const dbSaved = await createOrder({
-        ...newOrder,
-        user_name: user.name,
-        user_email: user.email
-      });
-
-      if (dbSaved) {
-        setShowReceipt(newOrder);
-        setCart([]);
-        setIsMobileCartOpen(false);
-        showNotification("Order placed successfully!");
-      } else {
-         // Even if DB fails, show receipt (offline fallback)
-         setShowReceipt(newOrder);
-         setCart([]);
-         setIsMobileCartOpen(false);
-      }
+      setShowReceipt(newOrder);
+      setCart([]);
+      setIsMobileCartOpen(false);
+      showNotification("Order placed successfully!");
+      setActiveOrderId(null);
     } else {
       alert("Payment Failed. Please try again.");
     }
@@ -1784,7 +1808,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* UPI MODAL */}
       {showUpiModal && (
         <div className="fixed inset-0 bg-slate-950/60 dark:bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl p-6 md:p-8 relative overflow-hidden flex flex-col items-center animate-bounce-in">
@@ -1796,22 +1819,34 @@ const App: React.FC = () => {
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Scan QR Code or Open App</p>
              </div>
 
-             <div className="bg-white p-4 rounded-2xl shadow-inner border-2 border-slate-100 mb-6 relative">
-                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR`} alt="UPI QR Code" className="w-48 h-48 mx-auto" />
-                 <div className="absolute inset-0 ring-4 ring-orange-500/20 rounded-2xl pointer-events-none"></div>
+             <div className="bg-white p-4 rounded-2xl shadow-inner border-2 border-slate-100 mb-6 relative group">
+                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`)}`} alt="UPI QR Code" className="w-48 h-48 mx-auto" />
+                 <div className="absolute inset-0 ring-4 ring-orange-500/10 rounded-2xl pointer-events-none group-hover:ring-orange-500/20 transition-all"></div>
+                 <div className="mt-4 text-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID: {activeOrderId?.split('-')[0] || 'Pending'}</span>
+                 </div>
              </div>
              
              <div className="text-center mb-6 w-full">
-                 <div className="text-sm font-bold text-slate-500 mb-1">Amount to Pay</div>
+                 <div className="text-sm font-bold text-slate-500 mb-1 font-mono uppercase tracking-tighter">Amount Due</div>
                  <div className="text-3xl font-black text-slate-900 dark:text-white">₹{cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</div>
              </div>
 
              <div className="w-full space-y-3 shrink-0">
                 <button 
-                    onClick={() => handlePayment('UPI', true)} 
-                    className="w-full py-4 bg-slate-900 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-600 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+                    onClick={() => {
+                        const upiLink = `upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`;
+                        window.location.href = upiLink;
+                    }} 
+                    className="w-full py-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg dark:shadow-none"
                 >
-                    Pay with UPI App <ArrowRight size={18} />
+                    Open UPI App <ArrowRight size={18} />
+                </button>
+                <button 
+                    onClick={() => handlePayment('UPI', true)} 
+                    className="w-full py-4 bg-orange-600 dark:bg-gradient-to-r dark:from-orange-500 dark:to-red-600 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+                >
+                    Confirm Payment <CheckCircle2 size={18} />
                 </button>
                 <button 
                     onClick={() => setShowUpiModal(false)} 

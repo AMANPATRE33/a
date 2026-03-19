@@ -37,12 +37,15 @@ export interface CartItem extends MenuItem {
   quantity: number;
 }
 
+export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed';
+
 export interface Receipt {
   id: string;
   items: CartItem[];
   total: number;
   timestamp: number;
   paymentMethod: string;
+  status: PaymentStatus;
 }
 
 export interface Feedback {

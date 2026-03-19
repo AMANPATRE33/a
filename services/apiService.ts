@@ -1,5 +1,5 @@
 import { supabase } from '../src/lib/supabase';
-import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, CameraFeed, MenuItem, Feedback } from '../types';
+import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, CameraFeed, MenuItem, Feedback, PaymentStatus } from '../types';
 import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
 
 /**
@@ -184,26 +184,63 @@ interface OrderRow {
   items: any; // Stored as JSONB
   total: number;
   payment_method: string;
+  status: string;
   created_at: string;
 }
 
-export const createOrder = async (order: Receipt & { user_email: string, user_name: string }): Promise<boolean> => {
-  const { error } = await supabase
+export const createOrder = async (order: Receipt & { user_email: string, user_name: string }): Promise<string | null> => {
+  const { data, error } = await supabase
     .from('orders')
     .insert([{
-      // Removed id because DB uses gen_random_uuid() and expects UUID, our frontend use string
       user_email: order.user_email,
-      // Removed user_name because it does not exist in the user's orders table
       items: order.items,
       total: order.total,
       payment_method: order.paymentMethod || 'UPI',
-      status: 'completed',
+      status: order.status || 'pending',
       created_at: new Date().toISOString()
-    }]);
+    }])
+    .select()
+    .single();
 
   if (error) {
     console.error("Order Error:", error);
     notifyError(`Failed to place order: ${error.message}`);
+    return null;
+  }
+  return data.id;
+};
+
+export const updateOrderStatus = async (orderId: string, status: PaymentStatus): Promise<boolean> => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ status })
+    .eq('id', orderId);
+
+  if (error) {
+    console.error("Update Status Error:", error);
+    notifyError(`Failed to update order status: ${error.message}`);
+    return false;
+  }
+  return true;
+};
+
+export const createPayment = async (payment: {
+  order_id: string;
+  amount: number;
+  payment_method: string;
+  transaction_id: string;
+  status: PaymentStatus;
+}): Promise<boolean> => {
+  const { error } = await supabase
+    .from('payments')
+    .insert([{
+      ...payment,
+      created_at: new Date().toISOString()
+    }]);
+
+  if (error) {
+    // If table doesn't exist, we'll just log and continue as it's optional for the demo
+    console.warn("Payments table not found or error:", error);
     return false;
   }
   return true;
@@ -229,7 +266,8 @@ export const fetchOrderHistory = async (userEmail: string): Promise<Receipt[]> =
     items: d.items,
     total: d.total,
     timestamp: new Date(d.created_at).getTime(),
-    paymentMethod: d.payment_method
+    paymentMethod: d.payment_method,
+    status: d.status as PaymentStatus
   }));
 };
 
