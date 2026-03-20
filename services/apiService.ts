@@ -38,6 +38,11 @@ const MOCK_FEEDBACK_STORE: Feedback[] = [
 
 // --- PYTHON API FUNCTIONS (Status, Tables, Cameras) ---
 
+/**
+ * Fetches the current live status of the cafeteria from the Python backend.
+ * Falls back to randomized mock data if the API is unreachable.
+ * @returns {Promise<CafeteriaStatus>} The live occupancy and crowd status.
+ */
 export const fetchStatus = async (): Promise<CafeteriaStatus> => {
   try {
     const response = await fetch(`${PYTHON_API_URL}/status`);
@@ -53,6 +58,12 @@ export const fetchStatus = async (): Promise<CafeteriaStatus> => {
   }
 };
 
+/**
+ * Fetches table occupancy details.
+ * If sensors are unavailable, estimates occupancy based on the number of people inside.
+ * @param {number} peopleInside - Current count of people in the cafeteria.
+ * @returns {Promise<TableStatus | null>} Count of occupied and empty tables.
+ */
 export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableStatus | null> => {
   try {
     const response = await fetch(`${PYTHON_API_URL}/api/tables`);
@@ -75,6 +86,11 @@ export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableS
   }
 };
 
+/**
+ * Retrieves the available camera feeds for visual monitoring.
+ * Displays offline placeholders if the live feed system is unavailable.
+ * @returns {Promise<CameraFeed[]>} Array of camera feed objects.
+ */
 export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
   try {
     const response = await fetch(`${PYTHON_API_URL}/cameras`);
@@ -114,6 +130,11 @@ interface MenuRow {
   image?: string; // Support legacy naming
 }
 
+/**
+ * Fetches the full menu list from the Supabase database.
+ * If the database connection fails, it falls back to a predefined initial menu.
+ * @returns {Promise<MenuItem[]>} List of available menu items.
+ */
 export const fetchMenu = async (): Promise<MenuItem[]> => {
   try {
     // Standard plural table name
@@ -147,6 +168,12 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
   }
 };
 
+/**
+ * Adds a new menu item to the database.
+ * Used by administrators to update the cafeteria's offerings.
+ * @param {MenuItem} item - The item to be added.
+ * @returns {Promise<boolean>} True if addition was successful.
+ */
 export const addMenuItemToDB = async (item: MenuItem): Promise<boolean> => {
   const { error } = await supabase
     .from('menu_items')
@@ -164,6 +191,11 @@ export const addMenuItemToDB = async (item: MenuItem): Promise<boolean> => {
   return true;
 };
 
+/**
+ * Removes a menu item from the database by its unique identifier.
+ * @param {string} id - The ID of the item to delete.
+ * @returns {Promise<boolean>} True if deletion was successful.
+ */
 export const deleteMenuItemFromDB = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('menu_items')
@@ -188,6 +220,12 @@ interface OrderRow {
   created_at: string;
 }
 
+/**
+ * Creates a new order in the database.
+ * Captures user details, items ordered, and payment preference.
+ * @param {Receipt & { user_email: string, user_name: string }} order - The order details.
+ * @returns {Promise<string | null>} The generated Order ID if successful.
+ */
 export const createOrder = async (order: Receipt & { user_email: string, user_name: string }): Promise<string | null> => {
   const { data, error } = await supabase
     .from('orders')
@@ -210,6 +248,12 @@ export const createOrder = async (order: Receipt & { user_email: string, user_na
   return data.id;
 };
 
+/**
+ * Updates the payment/fulfillment status of an existing order.
+ * @param {string} orderId - Unique order reference.
+ * @param {PaymentStatus} status - New status (e.g., 'paid', 'failed').
+ * @returns {Promise<boolean>} True if update was successful.
+ */
 export const updateOrderStatus = async (orderId: string, status: PaymentStatus): Promise<boolean> => {
   const { error } = await supabase
     .from('orders')
@@ -246,6 +290,11 @@ export const createPayment = async (payment: {
   return true;
 };
 
+/**
+ * Retrieves the order history for a specific student/user.
+ * @param {string} userEmail - The email address of the user.
+ * @returns {Promise<Receipt[]>} List of past orders.
+ */
 export const fetchOrderHistory = async (userEmail: string): Promise<Receipt[]> => {
   const { data, error } = await supabase
     .from('orders')
@@ -282,6 +331,11 @@ interface FeedbackRow {
   created_at: string;
 }
 
+/**
+ * Submits anonymous or user-specific feedback to the database.
+ * @param {Omit<Feedback, 'id' | 'timestamp'>} feedback - Rating and message details.
+ * @returns {Promise<boolean>} True if submission was successful.
+ */
 export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timestamp'>): Promise<boolean> => {
   const { error } = await supabase
     .from('feedback')
@@ -301,6 +355,11 @@ export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timest
   return true;
 };
 
+/**
+ * Fetches all public reviews and feedback entries.
+ * Returns mock data if no entries exist in the database yet.
+ * @returns {Promise<Feedback[]>} List of feedback entries.
+ */
 export const fetchReviews = async (): Promise<Feedback[]> => {
   const { data, error } = await supabase
     .from('feedback')
@@ -327,6 +386,12 @@ export const fetchReviews = async (): Promise<Feedback[]> => {
 };
 
 // 4. ANALYTICS (Calculated from Real DB Data)
+/**
+ * Generates analytics report (Revenue, Sales, Occupancy Trends).
+ * Combines real database statistics with historical trends.
+ * @param {string} timeframe - 'daily', 'weekly', or 'monthly'.
+ * @returns {Promise<AnalyticsData>} Aggregated analytics object.
+ */
 export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' = 'daily'): Promise<AnalyticsData> => {
   try {
     // Fetch all orders to calculate revenue and item sales
@@ -505,6 +570,13 @@ const getMockAnalytics = (timeframe: string): AnalyticsData => {
 
 // --- AUTHENTICATION ---
 
+/**
+ * Authenticates users based on role.
+ * Students use guest/email login, while Admins require full Supabase Auth.
+ * @param {string} emailOrUser - User's identifier.
+ * @param {string} [password] - Password for Admin accounts.
+ * @returns {Promise<User | null>} Authenticated user object or null.
+ */
 export const loginUser = async (emailOrUser: string, password?: string): Promise<User | null> => {
   // 1. Admin Login via Supabase Auth
   if (password) {

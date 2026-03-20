@@ -146,6 +146,36 @@ To run the full system locally (Frontend + Backend):
 
 ---
 
+## 🛠️ Developer Guide
+
+### Project Structure
+- `App.tsx`: Main application component containing all UI logic and routing.
+- `services/apiService.ts`: Centralized service for interacting with Supabase and the Python backend.
+- `src/lib/supabase.ts`: Supabase client configuration.
+- `types.ts`: TypeScript interfaces and types used across the application.
+- `constants.ts`: Global constants like `TOTAL_TABLES` and `POLL_INTERVAL`.
+
+### Coding Standards
+We follow standard React and TypeScript best practices. Please refer to [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines.
+
+---
+
+## 🧪 Testing
+
+We use **Vitest** for unit and integration testing.
+
+To run the tests:
+```bash
+npm test
+```
+
+To run tests in watch mode:
+```bash
+npm run test:watch
+```
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### Common Deployment Issues
