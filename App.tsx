@@ -1863,7 +1863,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl shadow-inner border-2 border-slate-100 mb-6 relative group">
-                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`)}`} alt="UPI QR Code" className="w-48 h-48 mx-auto" />
+                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`upi://pay?pa=amanpatre33@okicici&pn=Aman Patre&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`)}`} alt="UPI QR Code" className="w-48 h-48 mx-auto" />
                      <div className="absolute inset-0 ring-4 ring-orange-500/10 rounded-2xl pointer-events-none group-hover:ring-orange-500/20 transition-all"></div>
                      <div className="mt-4 text-center">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID: {activeOrderId?.split('-')[0] || 'Pending'}</span>
@@ -1878,7 +1878,7 @@ const App: React.FC = () => {
                   <div className="w-full space-y-3 shrink-0">
                      <button
                         onClick={() => {
-                           const upiLink = `upi://pay?pa=smartanna@upi&pn=SmartAnna&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`;
+                           const upiLink = encodeURI(`upi://pay?pa=amanpatre33@okicici&pn=Aman Patre&am=${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}&cu=INR&tn=${activeOrderId || 'Order'}`);
                            window.location.href = upiLink;
                         }}
                         className="w-full py-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black text-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg dark:shadow-none"
