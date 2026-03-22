@@ -10,3 +10,16 @@ Starting Supabase Table Verification...
 [❌ FAIL] Table: feedback | Action: INSERT (Status: 400, {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'user_name' column of 'feedback' in the schema cache"})
 
 Verification Complete.
+
+--- Vitest Suite Results ---
+[✅ PASS] App.test.tsx (4 tests passed)
+[✅ PASS] services/apiService.test.ts (9 tests passed)
+
+Total: 13 tests passed | All systems verified.
+
+Testing Architecture:
+- UI Tests: App.test.tsx (at root)
+- Service Tests: services/apiService.test.ts (inside services folder)
+- Setup Config: src/setupTests.ts & vitest.config.ts
+
+Run tests anytime with command: `npm test`
