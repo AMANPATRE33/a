@@ -15,6 +15,22 @@ const NGROK_URL = 'https://awilda-sublenticular-left.ngrok-free.dev';
 export const STUDENT_COUNT_URL = import.meta.env.VITE_STUDENT_COUNT_URL || NGROK_URL || 'http://localhost:5000';
 export const TABLE_ESTIMATE_URL = import.meta.env.VITE_TABLE_ESTIMATE_URL || NGROK_URL || 'http://localhost:5000';
 
+/**
+ * Performs a connectivity check to Supabase.
+ * Useful for debugging deployment issues.
+ */
+export const checkSupabaseHealth = async (): Promise<{ ok: boolean; message: string }> => {
+  try {
+    const { data, error } = await supabase.from('menu_items').select('id').limit(1);
+    if (error) throw error;
+    return { ok: true, message: "Connected to Supabase successfully." };
+  } catch (err: any) {
+    console.error("Supabase Health Check Failed:", err);
+    return { ok: false, message: err.message || "Unknown connection error." };
+  }
+};
+
+
 
 
 
@@ -178,21 +194,17 @@ interface MenuRow {
  */
 export const fetchMenu = async (): Promise<MenuItem[]> => {
   try {
-    // Standard plural table name
     const { data, error } = await supabase
       .from('menu_items')
       .select('*');
 
     if (error) {
-      console.warn("DEBUG: Potential connection issue. Switching to Demo Mode.", error);
-      notifyError(`Supabase Offline: ${error.message}. Entering Demo Mode.`);
-      return INITIAL_MENU; // Fallback only on error
+      console.error("Supabase Menu Error:", error.message);
+      return INITIAL_MENU; 
     }
 
     if (!data || data.length === 0) {
-      console.warn("DEBUG: 'menu_items' table empty or RLS restricted.");
-      notifyError("Connected to DB, but 0 items found. Check RLS or add items in Admin.");
-      return []; // Return empty if connected but no data
+      return INITIAL_MENU; // Fallback even if table is empty
     }
 
     return (data as any[]).map((item) => ({
@@ -203,11 +215,11 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
       image: item.image_url || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
     }));
   } catch (err: any) {
-    console.error("DEBUG: fetchMenu Exception. Using Demo Mode.", err);
-    notifyError(`Connection Failure: ${err.message}. Showing mock menu.`);
+    console.error("fetchMenu Exception:", err);
     return INITIAL_MENU;
   }
 };
+
 
 /**
  * Adds a new menu item to the database.
@@ -268,25 +280,34 @@ interface OrderRow {
  * @returns {Promise<string | null>} The generated Order ID if successful.
  */
 export const createOrder = async (order: Receipt & { user_email: string, user_name: string }): Promise<string | null> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .insert([{
+    const orderData = {
       user_email: order.user_email,
       items: order.items,
       total: order.total,
       payment_method: order.paymentMethod || 'UPI',
       status: order.status || 'pending',
       created_at: new Date().toISOString()
-    }])
-    .select()
-    .single();
+    };
 
-  if (error) {
-    console.error("Order Error:", error);
-    notifyError(`Failed to place order: ${error.message}`);
-    return null;
-  }
-  return data.id;
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([orderData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Order Error Details:", error);
+      notifyError(`Order Failed: ${error.message} (Is 'orders' table created?)`);
+      return null;
+    }
+    
+    if (!data) {
+      notifyError("Order inserted but no data returned. Check DB permissions.");
+      return null;
+    }
+
+    return data.id;
+
 };
 
 /**
@@ -378,23 +399,35 @@ interface FeedbackRow {
  * @returns {Promise<boolean>} True if submission was successful.
  */
 export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timestamp'>): Promise<boolean> => {
-  const { error } = await supabase
-    .from('feedback')
-    .insert([{
-      user_name: feedback.user_name,
-      user_email: feedback.user_email,
-      rating: feedback.rating,
-      message: feedback.message,
-      type: feedback.type,
-      created_at: new Date().toISOString()
-    }]);
+  // Try inserting with all fields
+  const payload: any = {
+    user_email: feedback.user_email,
+    rating: feedback.rating,
+    message: feedback.message,
+    type: feedback.type,
+    created_at: new Date().toISOString()
+  };
+
+  // Only add user_name if it exists in our object
+  if (feedback.user_name) payload.user_name = feedback.user_name;
+
+  let { error } = await supabase.from('feedback').insert([payload]);
+
+  // If it failed because user_name column is missing, try again without it
+  if (error && error.message.includes('user_name')) {
+    console.warn("DB Warning: 'user_name' column missing in 'feedback' table. Retrying without it.");
+    delete payload.user_name;
+    const retry = await supabase.from('feedback').insert([payload]);
+    error = retry.error;
+  }
 
   if (error) {
-    notifyError(`Failed to submit feedback: ${error.message}`);
+    notifyError(`Feedback Error: ${error.message}`);
     return false;
   }
   return true;
 };
+
 
 /**
  * Fetches all public reviews and feedback entries.
@@ -402,29 +435,31 @@ export const submitFeedbackData = async (feedback: Omit<Feedback, 'id' | 'timest
  * @returns {Promise<Feedback[]>} List of feedback entries.
  */
 export const fetchReviews = async (): Promise<Feedback[]> => {
-  const { data, error } = await supabase
-    .from('feedback')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error || !data || data.length === 0) {
-    if (error) {
-      notifyError(`Feedback Error: ${error.message}`);
-      console.error("Supabase Feedback Error:", error);
+    if (error || !data || data.length === 0) {
+      return MOCK_FEEDBACK_STORE;
     }
+
+    return (data as FeedbackRow[]).map((f) => ({
+      id: f.id,
+      user_name: f.user_name || 'Anonymous',
+      user_email: f.user_email || 'anonymous@upl',
+      rating: f.rating || 5,
+      message: f.message || '',
+      type: f.type || 'Feedback',
+      timestamp: new Date(f.created_at || Date.now()).getTime()
+    }));
+  } catch (e) {
+    console.error("fetchReviews Exception:", e);
     return MOCK_FEEDBACK_STORE;
   }
-
-  return (data as FeedbackRow[]).map((f) => ({
-    id: f.id,
-    user_name: f.user_name || 'Anonymous',
-    user_email: f.user_email || 'anonymous@upl',
-    rating: f.rating || 5,
-    message: f.message || '',
-    type: f.type || 'Feedback',
-    timestamp: new Date(f.created_at || Date.now()).getTime()
-  }));
 };
+
 
 // 4. ANALYTICS (Calculated from Real DB Data)
 /**

@@ -8,11 +8,13 @@
 
 This application is a **Hybrid System** that bridges the gap between physical sensors and digital services.
 
-### 1. 🧠 IoT & Sensor Integration (Python Backend)
-The system is designed to consume data from a local Python script (`backend/server.py`) that simulates or interfaces with physical hardware:
-*   **Real-Time Occupancy**: Tracks how many people are currently inside the cafeteria.
-*   **Table Availability**: Monitors specific tables to show which are free or occupied using simulated pressure/IR sensors.
-*   **Live Camera Feeds**: Streams CCTV footage (or simulated feeds) to the dashboard for security and crowd monitoring.
+### 1. 🧠 AI Vision Infrastructure (Python + Roboflow)
+The "heart" of Smart Anna's intelligence is its computer vision system. It uses **YOLO (You Only Look Once)** models for high-speed object detection:
+*   **Table Occupancy**: Uses a custom-trained Roboflow model (`new-z9psz`) to identify and number individual tables/seats in real-time.
+*   **People Counting**: Monitors the "Student Count" (inside vs outside) to calculate crowd density.
+*   **Performance Optimization**: Implements a frame-skipping logic (Inference every 1s) to ensure buttery-smooth video playback while maintaining real-time accuracy.
+*   **Hybrid Sync**: Local AI nodes (JupyterLab or Python scripts) push live counts to the cloud dashboard via a secure ngrok tunnel.
+
 
 ### 2. ☁️ Digital Services (Supabase Cloud)
 All persistent data and user interactions are handled by **Supabase** (PostgreSQL):

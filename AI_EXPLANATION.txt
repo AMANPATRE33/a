@@ -1,0 +1,69 @@
+# SMART ANNA - AI INFRASTRUCTURE EXPLANATION (FOR DEMO)
+
+## 🏆 Project Overview
+Smart Anna is an intelligent cafeteria management system that uses Computer Vision (AI) to eliminate the "waiting game." Instead of students walking to the cafeteria to check for space, the AI does it for them 24/7.
+
+---
+
+## 🛰️ How the AI Works (Step-by-Step)
+
+1. **CCTV/Camera Input**: 
+   The system takes a live feed from the cafeteria cameras (CCTV) or a video file.
+   
+2. **AI Inference (YOLO Architecture)**:
+   We use the **YOLO (You Only Look Once)** model via **Roboflow**. 
+   - **Why?**: YOLO is the fastest object detection model in the world, allowing us to detect multiple tables and people in milliseconds.
+   
+3. **The Counting Logic**:
+   - The AI identifies every "Occupied Seat/Table" and "Person."
+   - **Empty Tables Calculation**: (Total Capacity) - (Occupied Tables Detected) = Current Live Space.
+
+4. **Real-Time Sync**:
+   The Python script (AI Node) sends this "Count" to our backend server every 1 second. The server then pushes this live data to the Vercel Dashboard for students to see.
+
+---
+
+## 📈 AI Accuracy & Metrics (The Science)
+
+When presenting, you can explain these 3 key metrics provided by Roboflow:
+
+1. **mAP@50 (Mean Average Precision) - 91.5%**:
+   - **What it is**: The overall performance score of the model.
+   - **Our Result (91.5%)**: This is an excellent score, meaning the AI is incredibly reliable at identifying tables without being "confused."
+
+2. **Precision - 85.4%**:
+   - **Simple Explanation**: "When the AI says it's a table, how often is it actually a table?" 
+   - Our result (85.4%) confirms very few "False Alarms."
+
+3. **Recall - 88.4%**:
+   - **Simple Explanation**: "Of all the tables in the room, how many did the AI actually find?"
+   - Our result (88.4%) means the AI is excellent at not missing any tables.
+
+
+---
+
+## 🛠️ Performance Optimization: "Smooth Playback"
+
+**The Challenge**: AI is heavy. Running it 30 times a second (30 FPS) makes the video laggy and slow.
+**Our Solution**: 
+- We play the video at full speed (smooth movement).
+- We only run the AI detection once every 1 second (every 30 frames).
+- **Result**: A buttery-smooth visual experience with accurate, real-time data updates.
+
+---
+
+## 🚀 Key Presentation Points
+- **Automation**: No human intervention needed to count tables.
+- **Scalability**: Can be added to 100s of cameras across a campus.
+- **Privacy**: The AI only counts "boxes" and "numbers"; it doesn't store faces or personal data.
+- **Efficiency**: Reduces student wait-time and cafeteria overcrowding.
+
+---
+
+## 🛠️ TROUBLESHOOTING: Fixing Database Columns
+If you see an error like **"Could not find column 'user_name'"**, run this SQL in your Supabase SQL Editor:
+
+```sql
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_name TEXT;
+```
+This ensures your database matches the latest code!

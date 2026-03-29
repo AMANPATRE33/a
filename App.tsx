@@ -1054,7 +1054,8 @@ const App: React.FC = () => {
                            </div>
                         </header>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+
                            <StatusCard title="Inside" value={liveStatus.people_inside} icon={Users} color="bg-blue-600 text-blue-600" loading={isDashboardLoading} subLabel={
                               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${liveStatus.is_actual ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500'}`}>
                                  {liveStatus.is_actual ? <Eye size={10} className="animate-pulse" /> : <AlertCircle size={10} />}
@@ -1311,8 +1312,9 @@ const App: React.FC = () => {
                               {/* NEW 3D FLIP CARD GRID - UPDATED RESPONSIVENESS AND PERSISTENT ADD BUTTON */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12 md:gap-x-8 md:gap-y-14 justify-items-center pb-8">
                                  {filteredMenu.map(item => (
-                                    <div key={item.id} className="relative w-full max-w-[220px]">
+                                    <div key={item.id} className="relative w-full max-w-[280px] sm:max-w-[220px]">
                                        <div className="flip-card group cursor-pointer">
+
                                           <div className="flip-content">
                                              <div className="flip-front">
                                                 <div className="front-content">
@@ -1435,7 +1437,8 @@ const App: React.FC = () => {
                            <p className="text-slate-500 font-medium">Your voice shapes our cafeteria.</p>
                         </header>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
                            <div className="lg:col-span-1">
                               <form onSubmit={handleFeedbackSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 space-y-6 shadow-sm sticky top-6">
                                  <div>
@@ -1564,7 +1567,8 @@ const App: React.FC = () => {
                                  <StatusCard title="Top Seller" value={analyticsData.top_items[0]?.name.split(' ')[0] || 'N/A'} icon={Award} color="bg-purple-500 text-purple-500" />
                               </div>
 
-                              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+
                                  <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm">
                                     <div className="flex justify-between items-center mb-6">
                                        <h3 className="font-bold text-lg dark:text-white">Revenue Trend</h3>
@@ -1655,7 +1659,8 @@ const App: React.FC = () => {
                            <p className="text-sm text-slate-500 font-medium mt-1">Curate the cafeteria offerings.</p>
                         </header>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
                            <div className="lg:col-span-1">
                               <form onSubmit={handleAddMenuItem} className="sticky top-6 space-y-5 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                                  <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity bg-orange-500 pointer-events-none"></div>
