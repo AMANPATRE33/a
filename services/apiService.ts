@@ -9,9 +9,12 @@ import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
  * - Table Sensors
  * - Camera Feeds
  */
-// 👉 PASTE PYTHON BACKEND API URLS BELOW 👈
-export const STUDENT_COUNT_URL = import.meta.env.VITE_STUDENT_COUNT_URL || 'http://localhost:5000'; // For CV People Counting
-export const TABLE_ESTIMATE_URL = import.meta.env.VITE_TABLE_ESTIMATE_URL || 'http://localhost:5000'; // For Table AI (Adjust port if different)
+// 👉 PASTE YOUR NGROK URL HERE 👈
+const NGROK_URL = 'https://awilda-sublenticular-left.ngrok-free.dev';
+
+export const STUDENT_COUNT_URL = import.meta.env.VITE_STUDENT_COUNT_URL || NGROK_URL || 'http://localhost:5000';
+export const TABLE_ESTIMATE_URL = import.meta.env.VITE_TABLE_ESTIMATE_URL || NGROK_URL || 'http://localhost:5000';
+
 
 
 
@@ -52,11 +55,17 @@ const MOCK_FEEDBACK_STORE: Feedback[] = [
  */
 export const fetchStatus = async (): Promise<CafeteriaStatus> => {
   try {
-    const response = await fetch(`${STUDENT_COUNT_URL}/status`, {
+    const url = `${STUDENT_COUNT_URL}/status`;
+    console.log(`📡 Fetching Status from: ${url}`);
+    const response = await fetch(url, {
       headers: { 'ngrok-skip-browser-warning': 'true' }
     });
 
-    if (!response.ok) throw new Error('API unreachable');
+    if (!response.ok) {
+      console.error(`❌ Status fetch failed [${response.status}]: ${response.statusText}`);
+      throw new Error('API unreachable');
+    }
+
 
     const data = await response.json();
     return { ...data, is_actual: true };
@@ -81,12 +90,18 @@ export const fetchStatus = async (): Promise<CafeteriaStatus> => {
  */
 export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableStatus | null> => {
   try {
-    const response = await fetch(`${TABLE_ESTIMATE_URL}/api/tables?count=${peopleInside}`, {
+    const url = `${TABLE_ESTIMATE_URL}/api/tables?count=${peopleInside}`;
+    console.log(`📊 Fetching Tables from: ${url}`);
+    const response = await fetch(url, {
       headers: { 'ngrok-skip-browser-warning': 'true' }
     });
 
 
-    if (!response.ok) throw new Error("Sensor API not available");
+    if (!response.ok) {
+      console.error(`❌ Tables fetch failed [${response.status}]: ${response.statusText}`);
+      throw new Error("Sensor API not available");
+    }
+
     const data = await response.json();
     console.log("📊 API Table Data Received:", data);
     return { ...data, is_actual: true };
