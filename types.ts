@@ -17,7 +17,9 @@ export interface User {
 export interface CafeteriaStatus {
   people_inside: number;
   status: CrowdStatus;
+  is_actual: boolean;
 }
+
 
 export interface TableStatus {
   occupied_tables: number;

@@ -9,8 +9,15 @@ import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
  * - Table Sensors
  * - Camera Feeds
  */
-// 👉 PASTE PYTHON BACKEND API URL BELOW FOR STATUS AND TABLE ESTIMATE 👈
-const PYTHON_API_URL = `http://${window.location.hostname}:5000`;
+// 👉 PASTE PYTHON BACKEND API URLS BELOW 👈
+export const STUDENT_COUNT_URL = import.meta.env.VITE_STUDENT_COUNT_URL || 'http://localhost:5000'; // For CV People Counting
+export const TABLE_ESTIMATE_URL = import.meta.env.VITE_TABLE_ESTIMATE_URL || 'http://localhost:5000'; // For Table AI (Adjust port if different)
+
+
+
+
+
+
 
 // --- ERROR HANDLING SYSTEM ---
 type ErrorCallback = (message: string) => void;
@@ -45,16 +52,24 @@ const MOCK_FEEDBACK_STORE: Feedback[] = [
  */
 export const fetchStatus = async (): Promise<CafeteriaStatus> => {
   try {
-    const response = await fetch(`${PYTHON_API_URL}/status`);
+    const response = await fetch(`${STUDENT_COUNT_URL}/status`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    });
+
     if (!response.ok) throw new Error('API unreachable');
-    return await response.json();
+
+    const data = await response.json();
+    return { ...data, is_actual: true };
   } catch (error) {
+
     notifyError("Python API Offline: Falling back to mock live status estimation.");
     // Return a safe default if Python script is offline
     return {
       people_inside: Math.floor(Math.random() * 35) + 5, // Random occupancy between 5 and 40
-      status: CrowdStatus.MODERATE
+      status: CrowdStatus.MODERATE,
+      is_actual: false
     };
+
   }
 };
 
@@ -66,12 +81,19 @@ export const fetchStatus = async (): Promise<CafeteriaStatus> => {
  */
 export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableStatus | null> => {
   try {
-    const response = await fetch(`${PYTHON_API_URL}/api/tables`);
+    const response = await fetch(`${TABLE_ESTIMATE_URL}/api/tables?count=${peopleInside}`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    });
+
+
     if (!response.ok) throw new Error("Sensor API not available");
     const data = await response.json();
+    console.log("📊 API Table Data Received:", data);
     return { ...data, is_actual: true };
   } catch (error) {
+    console.error("❌ Table Fetch Error:", error);
     notifyError("Python API Offline: Falling back to AI table capacity estimation.");
+
     // Fallback: Estimate based on people count if sensors fail
     // Logic: 4 students occupy 1 table approx.
     const estimatedOccupied = Math.ceil(peopleInside / TABLE_CAPACITY);
@@ -93,9 +115,13 @@ export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableS
  */
 export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
   try {
-    const response = await fetch(`${PYTHON_API_URL}/cameras`);
+    const response = await fetch(`${STUDENT_COUNT_URL}/cameras`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    });
+
     if (!response.ok) throw new Error("Cameras API unreachable");
     return await response.json();
+
   } catch (e) {
     notifyError("Python API Offline: Displaying demo camera feeds.");
     // Return placeholder feeds if Python script is offline
@@ -449,12 +475,12 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
     });
 
     const totalItems = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
-    const categorySplit = totalItems > 0 
+    const categorySplit = totalItems > 0
       ? Object.entries(categoryCounts).map(([label, value]) => ({
-          label,
-          value: Math.round((value / totalItems) * 100),
-          color: label === 'Meals' ? '#f97316' : label === 'Snacks' ? '#3b82f6' : label === 'Beverages' ? '#10b981' : '#94a3b8'
-        }))
+        label,
+        value: Math.round((value / totalItems) * 100),
+        color: label === 'Meals' ? '#f97316' : label === 'Snacks' ? '#3b82f6' : label === 'Beverages' ? '#10b981' : '#94a3b8'
+      }))
       : getMockAnalytics(timeframe).category_split;
 
     // Mocking trends for now as they require complex time-series grouping

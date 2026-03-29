@@ -79,8 +79,12 @@ import {
    registerGlobalErrorCallback,
    fetchReviews,
    updateOrderStatus,
-   createPayment
+   createPayment,
+   STUDENT_COUNT_URL,
+   TABLE_ESTIMATE_URL
 } from './services/apiService';
+
+
 import {
    CafeteriaStatus,
    TableStatus,
@@ -367,7 +371,8 @@ const App: React.FC = () => {
 
    // --- App States ---
    const [activeTab, setActiveTab] = useState<'dashboard' | 'ordering' | 'visuals' | 'admin' | 'feedback' | 'analytics'>('dashboard');
-   const [liveStatus, setLiveStatus] = useState<CafeteriaStatus>({ people_inside: 0, status: CrowdStatus.FREE });
+   const [liveStatus, setLiveStatus] = useState<CafeteriaStatus>({ people_inside: 0, status: CrowdStatus.FREE, is_actual: false });
+
    const [tableStatus, setTableStatus] = useState<TableStatus | null>(null);
    const [cameraFeeds, setCameraFeeds] = useState<CameraFeed[]>([]);
    const [camerasLoading, setCamerasLoading] = useState(false);
@@ -1050,14 +1055,24 @@ const App: React.FC = () => {
                         </header>
 
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-                           <StatusCard title="Inside" value={liveStatus.people_inside} icon={Users} color="bg-blue-600 text-blue-600" loading={isDashboardLoading} />
+                           <StatusCard title="Inside" value={liveStatus.people_inside} icon={Users} color="bg-blue-600 text-blue-600" loading={isDashboardLoading} subLabel={
+                              <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${liveStatus.is_actual ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500'}`}>
+                                 {liveStatus.is_actual ? <Eye size={10} className="animate-pulse" /> : <AlertCircle size={10} />}
+                                 {liveStatus.is_actual ? 'Student AI' : 'Simulation'}
+                              </div>
+                           } />
+
+
                            <StatusCard title="Density" value={liveStatus.status} icon={PieChart} color={liveStatus.status === 'CROWDED' ? 'bg-red-500 text-red-500' : 'bg-green-500 text-green-500'} loading={isDashboardLoading} />
                            <StatusCard title="Free Tables" value={displayEmpty} icon={CheckCircle2} color="bg-emerald-500 text-emerald-500" loading={isDashboardLoading} subLabel={
                               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${tableStatus?.is_actual ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
-                                 {tableStatus?.is_actual ? <Wifi size={10} /> : <AlertCircle size={10} />}
-                                 {tableStatus?.is_actual ? 'Live' : 'AI Est'}
+                                 {tableStatus?.is_actual ? <Zap size={10} className="animate-pulse" /> : <AlertCircle size={10} />}
+                                 {tableStatus?.is_actual ? 'Table AI' : 'Local Est'}
                               </div>
                            } />
+
+
+
                            <StatusCard title="Advice" value={liveStatus.status === 'CROWDED' ? 'WAIT' : 'GO NOW'} icon={TrendingUp} color="bg-slate-800 text-slate-800 dark:bg-slate-200 dark:text-slate-200" loading={isDashboardLoading} />
                         </div>
 
@@ -1161,11 +1176,14 @@ const App: React.FC = () => {
                                     {tableStatus?.is_actual ? <Wifi size={24} /> : <WifiOff size={24} />}
                                  </div>
                                  <div>
-                                    <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">Real-Time Sensor Data</h3>
+                                    <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">AI Table Analysis</h3>
                                     <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                       SOURCE: {tableStatus?.is_actual ? 'IOT SENSORS (/api/tables)' : 'AI CROWD ESTIMATION'}
+                                       NODES: {liveStatus.is_actual ? 'STUDENT_CV' : 'MOCK'} + {tableStatus?.is_actual ? 'TABLE_YOLO' : 'ESTIMATE'}
                                     </p>
                                  </div>
+
+
+
                               </div>
 
                               {isDashboardLoading ? (
