@@ -12,7 +12,7 @@ This application is a **Hybrid System** that bridges the gap between physical se
 The "heart" of Smart Anna's intelligence is its computer vision system. It uses **YOLO (You Only Look Once)** models for high-speed object detection:
 *   **Table Occupancy**: Uses a custom-trained Roboflow model (`new-z9psz`) to identify and number individual tables/seats in real-time.
 *   **People Counting**: Monitors the "Student Count" (inside vs outside) to calculate crowd density.
-*   **Performance Optimization**: Implements a frame-skipping logic (Inference every 1s) to ensure buttery-smooth video playback while maintaining real-time accuracy.
+*   **Performance Optimization**: Implements efficient inference logic to ensure high accuracy while maintaining system responsiveness.
 *   **Hybrid Sync**: Local AI nodes (JupyterLab or Python scripts) push live counts to the cloud dashboard via a secure ngrok tunnel.
 
 
@@ -25,7 +25,7 @@ All persistent data and user interactions are handled by **Supabase** (PostgreSQ
 
 ### 3. 👥 User Roles
 *   **Student (Guest/User)**: Can view live crowd status, browse the menu, place orders, and submit feedback.
-*   **Admin**: Has access to a secured dashboard to manage the menu (add/remove items), view detailed analytics, and monitor security feeds.
+*   **Admin**: Has access to a secured dashboard to manage the menu (add/remove items) and view detailed analytics.
 
 ---
 
@@ -122,7 +122,7 @@ Follow these steps to deploy the application live. This guide assumes you have a
 
 ## ⚠️ Important Note on Python Backend
 
-The **Live Sensor Data** (Occupancy, Table Status, Camera Feeds) relies on the local Python script (`backend/server.py`).
+The **Live Sensor Data** (Occupancy, Table Status) relies on the local Python script (`backend/server.py`).
 
 *   **On Vercel**: The deployed app **cannot** access your local computer's Python script (localhost).
 *   **Fallback Mode**: When deployed, the app will automatically detect that the Python API is unreachable and switch to **Simulation Mode** (showing random/mock data for occupancy and tables) so the UI remains functional.
@@ -200,9 +200,8 @@ We have recently upgraded **Smart Anna** with several "smart" features to make i
 1.  **🚀 Smart Demo Mode**: If the internet or database goes down, the app won't crash! It now automatically switches to a "Demo Mode" so you can still see how the menu and ordering look.
 2.  **🔒 Better Login Security**: We added a small "Eye" icon to the password entry. Now you can double-check what you're typing before you hit login.
 3.  **🎨 New Iconic Branding**: We’ve updated the app with a bold new character logo, a catchy tagline (*"Swift. Smart. Satisfying."*), and official credits for **UPL University**.
-4.  **🚧 Transparency on Features**: Features like "Live Feeds" are now clearly marked as **UNDER DEVELOPMENT**. This lets users know we are still perfecting the AI vision parts of the system.
-5.  **🍱 Fixed Menu Loading**: We solved a bug where the food menu was showing up blank. It is now perfectly synced with your Supabase cloud database.
-6.  **📊 Live Analytics & Revenue Dashboard**: The Admin Revenue Dashboard is now fully wired up to real-time order and feedback data via Supabase. Orders reflect instantly in the system and charts are rock-solid, gracefully handling instances where there is zero activity without crashing.
+4.  **🍱 Fixed Menu Loading**: We solved a bug where the food menu was showing up blank. It is now perfectly synced with your Supabase cloud database.
+5.  **📊 Live Analytics & Revenue Dashboard**: The Admin Revenue Dashboard is now fully wired up to real-time order and feedback data via Supabase. Orders reflect instantly in the system and charts are rock-solid, gracefully handling instances where there is zero activity without crashing.
 
 ---
 © 2026 • All Rights Reserved to UPL University - BE 8 Project Team 

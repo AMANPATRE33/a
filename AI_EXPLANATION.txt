@@ -7,19 +7,19 @@ Smart Anna is an intelligent cafeteria management system that uses Computer Visi
 
 ## 🛰️ How the AI Works (Step-by-Step)
 
-1. **CCTV/Camera Input**: 
-   The system takes a live feed from the cafeteria cameras (CCTV) or a video file.
+1. **AI Environment Data**: 
+   The system processes visual data from the cafeteria (via AI sensors or cameras) to determine occupancy.
    
 2. **AI Inference (YOLO Architecture)**:
    We use the **YOLO (You Only Look Once)** model via **Roboflow**. 
-   - **Why?**: YOLO is the fastest object detection model in the world, allowing us to detect multiple tables and people in milliseconds.
+   - **Why?**: YOLO is the fastest object detection model in the world, allowing us to detect multiple tables and people in milliseconds, ensuring real-time data updates.
    
 3. **The Counting Logic**:
    - The AI identifies every "Occupied Seat/Table" and "Person."
    - **Empty Tables Calculation**: (Total Capacity) - (Occupied Tables Detected) = Current Live Space.
 
 4. **Real-Time Sync**:
-   The Python script (AI Node) sends this "Count" to our backend server every 1 second. The server then pushes this live data to the Vercel Dashboard for students to see.
+   The Python script (AI Node) sends this "Count" to our backend server. The server then updates the Dashboard for students to see the live cafeteria status.
 
 ---
 
@@ -42,19 +42,20 @@ When presenting, you can explain these 3 key metrics provided by Roboflow:
 
 ---
 
-## 🛠️ Performance Optimization: "Smooth Playback"
+## 🛠️ Performance Optimization: "Efficient Inference"
 
-**The Challenge**: AI is heavy. Running it 30 times a second (30 FPS) makes the video laggy and slow.
+**The Challenge**: AI processing is computationally heavy.
 **Our Solution**: 
-- We play the video at full speed (smooth movement).
-- We only run the AI detection once every 1 second (every 30 frames).
-- **Result**: A buttery-smooth visual experience with accurate, real-time data updates.
+- We optimize the inference frequency to balance accuracy and system load.
+- We only run the AI detection at intervals (e.g., every 1 second).
+- **Result**: A responsive dashboard with accurate, real-time data updates.
+
 
 ---
 
 ## 🚀 Key Presentation Points
 - **Automation**: No human intervention needed to count tables.
-- **Scalability**: Can be added to 100s of cameras across a campus.
+- **Scalability**: The system can be scaled across various cafeteria zones.
 - **Privacy**: The AI only counts "boxes" and "numbers"; it doesn't store faces or personal data.
 - **Efficiency**: Reduces student wait-time and cafeteria overcrowding.
 

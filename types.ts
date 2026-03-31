@@ -68,12 +68,4 @@ export interface AnalyticsData {
   revenue_trend: { label: string; value: number }[]; // For Line Chart
   category_split: { label: string; value: number; color: string }[]; // For Pie Chart
   occupancy_trend: { label: string; value: number }[]; // NEW: For Bar Chart
-}
-
-export interface CameraFeed {
-  id: string;
-  name: string;
-  url: string;
-  status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
-  location: string;
-}
+}

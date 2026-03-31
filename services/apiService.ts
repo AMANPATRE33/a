@@ -1,5 +1,5 @@
 import { supabase } from '../src/lib/supabase';
-import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, CameraFeed, MenuItem, Feedback, PaymentStatus } from '../types';
+import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, MenuItem, Feedback, PaymentStatus } from '../types';
 import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
 
 /**
@@ -139,41 +139,7 @@ export const fetchTableStatus = async (peopleInside: number = 0): Promise<TableS
   }
 };
 
-/**
- * Retrieves the available camera feeds for visual monitoring.
- * Displays offline placeholders if the live feed system is unavailable.
- * @returns {Promise<CameraFeed[]>} Array of camera feed objects.
- */
-export const fetchCameraFeeds = async (): Promise<CameraFeed[]> => {
-  try {
-    const response = await fetch(`${STUDENT_COUNT_URL}/cameras`, {
-      headers: { 'ngrok-skip-browser-warning': 'true' }
-    });
 
-    if (!response.ok) throw new Error("Cameras API unreachable");
-    return await response.json();
-
-  } catch (e) {
-    notifyError("Python API Offline: Displaying demo camera feeds.");
-    // Return placeholder feeds if Python script is offline
-    return [
-      {
-        id: 'cam-01',
-        name: 'Main Entrance',
-        url: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=60',
-        status: 'OFFLINE',
-        location: 'Gate A'
-      },
-      {
-        id: 'cam-02',
-        name: 'Dining Area',
-        url: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=60',
-        status: 'OFFLINE',
-        location: 'Floor 1'
-      }
-    ];
-  }
-};
 
 // --- SUPABASE DATABASE FUNCTIONS (Menu, Orders, Feedback) ---
 

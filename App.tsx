@@ -3,7 +3,6 @@ import {
    Users,
    LayoutDashboard,
    ChefHat,
-   Camera,
    CreditCard,
    PieChart,
    AlertTriangle,
@@ -34,7 +33,6 @@ import {
    Award,
    RefreshCw,
    Signal,
-   VideoOff,
    Armchair,
    Search,
    Filter,
@@ -66,7 +64,6 @@ import {
 import {
    fetchStatus,
    fetchTableStatus,
-   fetchCameraFeeds,
    loginUser,
    processPaymentMock,
    createOrder,
@@ -94,7 +91,6 @@ import {
    Receipt,
    User,
    AnalyticsData,
-   CameraFeed,
    Feedback,
    PaymentStatus
 } from './types';
@@ -374,8 +370,7 @@ const App: React.FC = () => {
    const [liveStatus, setLiveStatus] = useState<CafeteriaStatus>({ people_inside: 0, status: CrowdStatus.FREE, is_actual: false });
 
    const [tableStatus, setTableStatus] = useState<TableStatus | null>(null);
-   const [cameraFeeds, setCameraFeeds] = useState<CameraFeed[]>([]);
-   const [camerasLoading, setCamerasLoading] = useState(false);
+
    const [isDashboardLoading, setIsDashboardLoading] = useState(true);
    const [menu, setMenu] = useState<MenuItem[]>([]);
    const [cart, setCart] = useState<CartItem[]>([]);
@@ -506,21 +501,7 @@ const App: React.FC = () => {
       setReviews(data);
    }, []);
 
-   const loadCameras = useCallback(async () => {
-      if (user) {
-         setCamerasLoading(true);
-         const feeds = await fetchCameraFeeds();
-         if (feeds.length > 0) {
-            setTimeout(() => {
-               setCameraFeeds(feeds);
-               setCamerasLoading(false);
-            }, 800);
-         } else {
-            setCameraFeeds([]);
-            setCamerasLoading(false);
-         }
-      }
-   }, [user]);
+
 
    /**
     * Effect: Sets up a global error callback to display notifications.
@@ -545,10 +526,9 @@ const App: React.FC = () => {
 
 
    useEffect(() => {
-      if (activeTab === 'visuals') loadCameras();
       if (activeTab === 'ordering' || activeTab === 'admin') refreshMenu();
       if (activeTab === 'feedback') loadReviews();
-   }, [loadCameras, refreshMenu, loadReviews, activeTab]);
+   }, [refreshMenu, loadReviews, activeTab]);
 
    useEffect(() => {
       if (user?.role === 'ADMIN' && activeTab === 'analytics') {
@@ -861,7 +841,6 @@ const App: React.FC = () => {
                   <NavItem icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                   <NavItem icon={CreditCard} label="Order Food" active={activeTab === 'ordering'} onClick={() => setActiveTab('ordering')} />
                   <NavItem icon={MessageSquare} label="Feedback" active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} />
-                  <NavItem icon={Camera} label="Live Feeds" active={activeTab === 'visuals'} onClick={() => setActiveTab('visuals')} />
 
                   {user.role === 'ADMIN' && (
                      <>
@@ -1398,37 +1377,7 @@ const App: React.FC = () => {
                   )}
 
                   {/* ... (Visuals, Feedback, Admin, Mobile Nav, Modals kept same) ... */}
-                  {activeTab === 'visuals' && (
-                     <div className="max-w-7xl mx-auto space-y-6">
-                        <header className="flex justify-between items-end">
-                           <div>
-                              <div className="flex items-center gap-3">
-                                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Live Feeds</h2>
-                                 <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-black px-3 py-1 rounded-full border border-orange-200 dark:border-orange-800 animate-pulse">UNDER DEVELOPMENT</span>
-                              </div>
-                              <p className="text-xs md:text-sm text-slate-500">Real-time CCTV coverage powered by AI.</p>
-                           </div>
-                           <button onClick={loadCameras} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500">
-                              <RefreshCw size={20} className={camerasLoading ? 'animate-spin' : ''} />
-                           </button>
-                        </header>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                           {camerasLoading ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse"></div>) : cameraFeeds.map((feed) => (
-                              <div key={feed.id} className="relative rounded-3xl overflow-hidden aspect-video bg-black group">
-                                 <img src={feed.url} className={`w-full h-full object-cover ${feed.status !== 'ONLINE' ? 'grayscale opacity-50' : ''}`} alt={feed.name} />
-                                 <div className="absolute top-4 left-4 flex gap-2"><div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase backdrop-blur-md ${feed.status === 'ONLINE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'}`}>{feed.status === 'ONLINE' ? 'LIVE' : 'OFFLINE'}</div></div>
-                                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent"><div className="text-white font-bold text-sm md:text-lg">{feed.name}</div><div className="text-white/70 text-xs">{feed.location}</div></div>
-                              </div>
-                           ))}
-                           {user.role === 'ADMIN' && !camerasLoading && (
-                              <button className="rounded-3xl border-4 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400 hover:text-orange-500 hover:border-orange-200 dark:hover:border-orange-900 transition-all group aspect-video bg-slate-50/50 dark:bg-slate-900/50">
-                                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white dark:bg-slate-800 shadow-sm group-hover:bg-orange-50 dark:group-hover:bg-orange-900/20 flex items-center justify-center mb-4 transition-colors"><Plus size={24} className="md:w-8 md:h-8" /></div>
-                                 <span className="font-bold text-sm">Connect New Feed</span>
-                              </button>
-                           )}
-                        </div>
-                     </div>
-                  )}
+
 
                   {activeTab === 'feedback' && (
                      <div className="max-w-6xl mx-auto space-y-10">
@@ -1747,7 +1696,6 @@ const App: React.FC = () => {
                <nav className="md:hidden fixed bottom-6 left-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border border-white/20 dark:border-slate-700/50 p-2 rounded-full z-50 flex justify-between items-center shadow-2xl shadow-slate-200/50 dark:shadow-black/80 ring-1 ring-black/5 dark:ring-white/5">
                   <MobileNavItem icon={LayoutDashboard} label="Home" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileAdminMenuOpen(false); }} />
                   <MobileNavItem icon={CreditCard} label="Order" active={activeTab === 'ordering'} onClick={() => { setActiveTab('ordering'); setIsMobileAdminMenuOpen(false); }} />
-                  <MobileNavItem icon={Camera} label="Live" active={activeTab === 'visuals'} onClick={() => { setActiveTab('visuals'); setIsMobileAdminMenuOpen(false); }} />
                   <MobileNavItem icon={MessageSquare} label="Buzz" active={activeTab === 'feedback'} onClick={() => { setActiveTab('feedback'); setIsMobileAdminMenuOpen(false); }} />
                   {user.role === "ADMIN" && (
                      <div className="relative flex-1 flex justify-center">
