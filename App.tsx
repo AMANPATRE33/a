@@ -77,6 +77,8 @@ import {
    fetchReviews,
    updateOrderStatus,
    createPayment,
+   fetchPendingOrdersCount,
+   exportReportToCSV,
    STUDENT_COUNT_URL,
    TABLE_ESTIMATE_URL
 } from './services/apiService';
@@ -368,6 +370,9 @@ const App: React.FC = () => {
    // --- App States ---
    const [activeTab, setActiveTab] = useState<'dashboard' | 'ordering' | 'visuals' | 'admin' | 'feedback' | 'analytics'>('dashboard');
    const [liveStatus, setLiveStatus] = useState<CafeteriaStatus>({ people_inside: 0, status: CrowdStatus.FREE, is_actual: false });
+   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+   const [estimatedWaitTime, setEstimatedWaitTime] = useState(0);
+   const [lastOrder, setLastOrder] = useState<CartItem[] | null>(null);
 
    const [tableStatus, setTableStatus] = useState<TableStatus | null>(null);
 
@@ -416,6 +421,30 @@ const App: React.FC = () => {
    const [recommendation, setRecommendation] = useState<MenuItem | null>(null);
    const [showRecommendation, setShowRecommendation] = useState(false);
    const [showPassword, setShowPassword] = useState(false); // NEW: Password visibility toggle
+
+   /**
+    * Effect: Loads the last successfully placed order from localStorage.
+    */
+   useEffect(() => {
+      const stored = localStorage.getItem('smart_anna_last_order');
+      if (stored) {
+         try {
+            setLastOrder(JSON.parse(stored));
+         } catch (e) {
+            console.error("Failed to parse last order", e);
+         }
+      }
+   }, []);
+
+   /**
+    * Effect: Calculates estimated wait time based on occupancy and pending orders.
+    */
+   useEffect(() => {
+      // Logic: 10 people/min counter speed + 2 mins per pending order
+      const baseWait = Math.ceil(liveStatus.people_inside / 10);
+      const orderWait = pendingOrdersCount * 2;
+      setEstimatedWaitTime(baseWait + orderWait);
+   }, [liveStatus.people_inside, pendingOrdersCount]);
 
    /**
     * Effect: Monitors the theme preference and updates the document class.
@@ -489,6 +518,10 @@ const App: React.FC = () => {
          setLiveStatus(status);
          const tStatus = await fetchTableStatus(status.people_inside);
          setTableStatus(tStatus);
+         
+         // Also fetch global pending orders for wait time
+         const pCount = await fetchPendingOrdersCount();
+         setPendingOrdersCount(pCount);
       } catch (e) {
          console.warn("Update failed", e);
       } finally {
@@ -606,10 +639,22 @@ const App: React.FC = () => {
       setIsDashboardLoading(true);
    };
 
-   const estimatedOccupied = Math.ceil(liveStatus.people_inside / TABLE_CAPACITY);
-   const displayOccupied = tableStatus?.occupied_tables ?? estimatedOccupied;
-   const displayEmpty = TOTAL_TABLES - displayOccupied;
-   const occupancyPercentage = Math.round((displayOccupied / TOTAL_TABLES) * 100);
+    const estimatedOccupied = Math.ceil(liveStatus.people_inside / TABLE_CAPACITY);
+    const displayOccupied = tableStatus?.occupied_tables ?? estimatedOccupied;
+    const displayEmpty = TOTAL_TABLES - displayOccupied;
+    const occupancyPercentage = Math.round((displayOccupied / TOTAL_TABLES) * 100);
+
+    // --- NEW SMART ADVICE LOGIC (Optimized with useMemo) ---
+    const smartAdvice = useMemo(() => {
+       const isFull = displayEmpty <= 5 || liveStatus.people_inside > 65;
+       const isLimited = displayEmpty <= 15 || liveStatus.people_inside > 50;
+       const isGreat = displayEmpty >= 40 && liveStatus.people_inside < 25;
+
+       if (isFull) return { val: 'WAIT', sub: 'Too Crowded', color: 'bg-red-500 text-red-500' };
+       if (isLimited) return { val: 'LIMITED', sub: 'Few spots left', color: 'bg-orange-500 text-orange-500' };
+       if (isGreat) return { val: 'GO NOW', sub: 'Perfect! Huge Space', color: 'bg-green-600 text-green-600' };
+       return { val: 'GO NOW', sub: 'Enough Seats', color: 'bg-green-500 text-green-500' };
+    }, [displayEmpty, liveStatus.people_inside]);
 
    /**
     * Admin: Adds a new item to the cafeteria menu.
@@ -657,6 +702,26 @@ const App: React.FC = () => {
          } else {
             refreshMenu();
          }
+      }
+   };
+
+   const handleExportReport = async () => {
+      showNotification("Generating report...");
+      try {
+         const csvContent = await exportReportToCSV();
+         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement("a");
+         link.setAttribute("href", url);
+         link.setAttribute("download", `smart_anna_report_${new Date().toISOString().split('T')[0]}.csv`);
+         link.style.visibility = 'hidden';
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         showNotification("Report downloaded successfully!");
+      } catch (error) {
+         console.error("Export Error:", error);
+         showNotification("Failed to generate report.");
       }
    };
 
@@ -787,6 +852,10 @@ const App: React.FC = () => {
             paymentMethod: method,
             status: 'paid'
          };
+
+         // 🔥 SAVE TO LOCALSTORAGE FOR QUICK REORDER 🔥
+         localStorage.setItem('smart_anna_last_order', JSON.stringify([...cart]));
+         setLastOrder([...cart]);
 
          setShowReceipt(newOrder);
          setCart([]);
@@ -1033,7 +1102,7 @@ const App: React.FC = () => {
                            </div>
                         </header>
 
-                        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
 
                            <StatusCard title="Inside" value={liveStatus.people_inside} icon={Users} color="bg-blue-600 text-blue-600" loading={isDashboardLoading} subLabel={
                               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${liveStatus.is_actual ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500'}`}>
@@ -1053,19 +1122,31 @@ const App: React.FC = () => {
 
 
 
-                           <StatusCard title="Advice" value={liveStatus.status === 'CROWDED' ? 'WAIT' : 'GO NOW'} icon={TrendingUp} color="bg-slate-800 text-slate-800 dark:bg-slate-200 dark:text-slate-200" loading={isDashboardLoading} />
+                           <StatusCard 
+                              title="Advice" 
+                              value={smartAdvice.val} 
+                              icon={TrendingUp} 
+                              color={smartAdvice.val === 'WAIT' ? 'bg-red-500 text-red-500' : (smartAdvice.val === 'LIMITED' ? 'bg-orange-500 text-orange-500' : 'bg-green-500 text-green-500')} 
+                              loading={isDashboardLoading} 
+                              subLabel={
+                                 <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 capitalize">
+                                    <Clock size={10} /> {estimatedWaitTime} min wait • 
+                                    {smartAdvice.sub}
+                                 </div>
+                              }
+                           />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                           <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-                              <div className="flex justify-between items-center mb-6 md:mb-8">
-                                 <h3 className="text-lg md:text-xl font-black dark:text-white">Floor Map ({TOTAL_TABLES})</h3>
-                                 <div className="flex gap-4">
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Full</span></div>
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-400"></span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Partial</span></div>
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Free</span></div>
-                                 </div>
-                              </div>
+                           <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-500">
+                               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-4">
+                                  <h3 className="text-lg md:text-xl font-black dark:text-white">Live Floor Map ({TOTAL_TABLES})</h3>
+                                  <div className="flex flex-wrap gap-3 md:gap-4 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-800/50">
+                                     <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></span><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Full</span></div>
+                                     <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.5)]"></span><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Partial</span></div>
+                                     <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span><span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Free</span></div>
+                                  </div>
+                               </div>
                               {isDashboardLoading ? (
                                  <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-1.5 md:gap-3">
                                     {Array.from({ length: TOTAL_TABLES }).map((_, i) => (
@@ -1081,6 +1162,7 @@ const App: React.FC = () => {
                                           const fullTablesCount = Math.floor(totalPeople / capacity);
                                           const peopleInPartialTable = totalPeople % capacity;
 
+                                          // ✨ SERIAL OCCUPANCY: Occupy tables in increasing order (T1, T2...)
                                           let status = 'FREE';
                                           let peopleHere = 0;
 
@@ -1090,9 +1172,6 @@ const App: React.FC = () => {
                                           } else if (i === fullTablesCount && peopleInPartialTable > 0) {
                                              status = 'PARTIAL';
                                              peopleHere = peopleInPartialTable;
-                                          } else {
-                                             status = 'FREE';
-                                             peopleHere = 0;
                                           }
 
                                           let cardClass = "bg-green-100 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400";
@@ -1110,16 +1189,17 @@ const App: React.FC = () => {
                                           }
 
                                           return (
-                                             <div key={i} className={`flex flex-col items-center justify-between p-2 rounded-xl border aspect-square transition-all duration-300 ${cardClass}`}>
-                                                <UtensilsCrossed size={16} strokeWidth={2.5} className="mt-1 opacity-80" />
-                                                <span className="text-[10px] md:text-xs font-black uppercase tracking-tight">
+                                             <div key={i} className={`flex flex-col items-center justify-between p-2 rounded-xl border aspect-square transition-all duration-300 hover:scale-[1.05] hover:shadow-lg relative overflow-hidden ${cardClass}`}>
+                                                <div className="absolute top-0 left-0 w-full h-[2px] opacity-20 bg-white"></div>
+                                                <UtensilsCrossed size={14} strokeWidth={3} className="mt-1 opacity-70 group-hover:rotate-12 transition-transform" />
+                                                <span className="text-[9px] md:text-xs font-black uppercase tracking-tight">
                                                    T-{i + 1}
                                                 </span>
-                                                <div className="flex gap-[2px]">
+                                                <div className="flex gap-[2px] md:gap-1">
                                                    {Array.from({ length: 5 }).map((_, dotIdx) => (
                                                       <div
                                                          key={dotIdx}
-                                                         className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${dotIdx < peopleHere ? dotFilledClass : dotEmptyClass}`}
+                                                         className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full transition-colors duration-500 ${dotIdx < peopleHere ? dotFilledClass : dotEmptyClass}`}
                                                       ></div>
                                                    ))}
                                                 </div>
@@ -1274,6 +1354,32 @@ const App: React.FC = () => {
                                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-full border text-xs font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-orange-600 text-white border-orange-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'}`}>{cat}</button>
                                     ))}
                                  </div>
+
+                                 {/* QUICK REORDER UI */}
+                                 {lastOrder && (
+                                    <div className="bg-slate-900 dark:bg-orange-950/20 border border-slate-700/50 dark:border-orange-900/30 p-4 rounded-2xl flex items-center justify-between mb-4 animate-in slide-in-from-top duration-500">
+                                       <div className="flex items-center gap-3">
+                                          <div className="bg-orange-500/20 p-2 rounded-xl text-orange-500">
+                                             <Zap size={18} />
+                                          </div>
+                                          <div>
+                                             <p className="text-xs font-black text-white uppercase tracking-widest">Quick Reorder</p>
+                                             <p className="text-[10px] text-slate-400 font-bold truncate max-w-[150px] md:max-w-xs">
+                                                {lastOrder.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                                             </p>
+                                          </div>
+                                       </div>
+                                       <button
+                                          onClick={() => {
+                                             setCart([...lastOrder]);
+                                             showNotification("Previous order items added to cart!");
+                                          }}
+                                          className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95"
+                                       >
+                                          ORDER AGAIN
+                                       </button>
+                                    </div>
+                                 )}
                               </header>
 
                               {/* DEBUG INFO FOR USER */}
@@ -1289,7 +1395,7 @@ const App: React.FC = () => {
                               )}
 
                               {/* NEW 3D FLIP CARD GRID - UPDATED RESPONSIVENESS AND PERSISTENT ADD BUTTON */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12 md:gap-x-8 md:gap-y-14 justify-items-center pb-8">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                                  {filteredMenu.map(item => (
                                     <div key={item.id} className="relative w-full max-w-[280px] sm:max-w-[220px]">
                                        <div className="flip-card group cursor-pointer">
@@ -1505,7 +1611,7 @@ const App: React.FC = () => {
                               <div className="flex flex-wrap gap-3 md:gap-4 pb-2">
                                  <button onClick={() => { setAnalyticsData(null); fetchAnalytics(analyticsTimeframe).then(setAnalyticsData); }} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:-translate-y-0.5 transition-all shadow-sm"><RefreshCw size={16} /> Refresh</button>
                                  <button onClick={() => setActiveTab('admin')} className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:-translate-y-0.5 transition-all active:scale-95"><PlusCircle size={16} /> Add Menu Item</button>
-                                 <button onClick={() => showNotification("Report generation coming soon.")} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-sm"><FileText size={16} className="text-blue-500" /> Export Report</button>
+                                 <button onClick={handleExportReport} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-sm"><FileText size={16} className="text-blue-500" /> Export Report</button>
                                  <button onClick={() => setActiveTab('feedback')} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-sm"><MessageSquare size={16} className="text-yellow-500" /> View All Bugs</button>
                               </div>
 

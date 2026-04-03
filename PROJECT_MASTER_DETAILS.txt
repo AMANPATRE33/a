@@ -1,0 +1,265 @@
+================================================================================
+               SMART ANNA - INTELLIGENT CAFETERIA SYSTEM
+                    Master Project Documentation (Final)
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+Project Name    : Smart Anna - Intelligent Cafeteria
+Project Type    : Full-Stack Web Application (Hybrid IoT + Cloud AI)
+Institution     : UPL University - BE 8 Project Team
+Year            : 2026
+Tagline         : "Swift. Smart. Satisfying."
+Subtitle        : "Intelligence at your service"
+
+DESCRIPTION:
+Smart Anna is a next-generation, AI-powered cafeteria management ecosystem
+that leverages Computer Vision (YOLO) and real-time data aggregation to 
+optimize cafeteria operations. It provides students with live occupancy 
+insights before they arrive, streamlines the food ordering process via 
+digital payments (UPI), and empowers administrators with data-driven 
+revenue and occupancy analytics.
+
+MISSION:
+To eliminate overcrowding, reduce wait times, and digitize the manual 
+cafeteria experience using state-of-the-art AI and cloud technologies.
+
+
+================================================================================
+                        SYSTEM ARCHITECTURE
+================================================================================
+Smart Anna uses a "Push-Pull" hybrid architecture:
+
+1. AI NODE (CCTV/YOLO):
+   - Multiple camera feeds (Camera-A, Camera-B) are processed in real-time.
+   - YOLO model identifies people/occupied seats.
+   - Aggregated counts are "pushed" to the Backend API via HTTP POST.
+
+2. BACKEND AGGREGATOR (FastAPI):
+   - Acts as a real-time data bridge.
+   - Stores current occupancy and table status in memory for zero-latency.
+   - Provides REST endpoints for the Frontend to query live status.
+
+3. PERSISTENCE LAYER (Supabase):
+   - Cloud-hosted PostgreSQL database.
+   - Manages persistent data: Menu Items, Orders, and User Feedback.
+   - Handles Admin Authentication.
+
+4. FRONTEND (React/Vite):
+   - High-performance, responsive UI.
+   - "Pulls" live data every 3 seconds for real-time dashboard updates.
+   - Manages ordering flow, payments, and analytics visualization.
+
+--------------------------------------------------------------------------------
+Architecture Flowchart (Mermaid):
+--------------------------------------------------------------------------------
+```mermaid
+graph TD
+    A[CCTV Camera A] -->|Frame| B(AI Node: YOLO)
+    C[CCTV Camera B] -->|Frame| B
+    B -->|POST: /update_people_count| D[FastAPI Backend]
+    D -->|GET: /status| E[React Frontend Dashboard]
+    E -->|Fetch/Post| F[Supabase Cloud DB]
+    F ---|menu_items, orders, feedback| F
+```
+
+
+================================================================================
+                        TECHNOLOGY STACK
+================================================================================
+
+FRONTEND (Web Interface):
+  - React 18.2 (TypeScript)
+  - Vite 7.3 (Build Tool)
+  - Tailwind CSS (Via CDN & Custom Utility Classes)
+  - Lucide React (Iconography - 60+ components)
+  - Custom SVG Components (Charts/Graphs - No heavy libraries)
+
+BACKEND (Data Router):
+  - Python 3.10+
+  - FastAPI (High-performance API Framework)
+  - Uvicorn (ASGI Server)
+  - Requests (For AI-to-Backend communication)
+
+AI & COMPUTER VISION:
+  - YOLOv8 (You Only Look Once - Object Detection)
+  - Roboflow (Model Registry & Cloud Hosting)
+  - OpenCV (Video Stream Processing)
+  - Multi-threaded processing for dual-camera support
+
+DATABASE:
+  - Supabase (PostgreSQL - Primary Clound DB)
+  - SQLite (Local development fallback in Python)
+  - SQLAlchemy (Python ORM)
+
+
+================================================================================
+                       AI INFRASTRUCTURE (The Science)
+================================================================================
+
+The "Intelligence" in Smart Anna is powered by advanced object detection models.
+
+MODEL SPECIFICATIONS:
+  - Architecture: YOLO (Custom Trained on Cafeteria Dataset)
+  - Deployment: Edge Processing Node (Python scripts)
+  - Connectivity: Real-time API Push to Central Server
+
+PERFORMANCE METRICS (Roboflow Certified):
+  - mAP@50 (Mean Average Precision): 91.5%
+  - Precision: 85.4%
+  - Recall: 88.4%
+
+COUNTING LOGIC:
+  - The AI counts individual "boxes" identified as "heads" or "people."
+  - It filters by confidence score (42%+) to ensure accuracy.
+  - Frequency: Inference runs every ~1 second (30 frames) to optimize CPU load.
+
+
+================================================================================
+                        DATABASE SCHEMA (ERD)
+================================================================================
+
+The system relies on three primary tables in the Supabase Cloud Database.
+
+--------------------------------------------------------------------------------
+ER Diagram (Mermaid):
+--------------------------------------------------------------------------------
+```mermaid
+erDiagram
+    MENU_ITEMS ||--o{ ORDERS : "contained in"
+    STUDENTS ||--o{ ORDERS : "places"
+    STUDENTS ||--o{ FEEDBACK : "submits"
+    
+    MENU_ITEMS {
+        uuid id PK
+        string name
+        numeric price
+        string category
+        string image_url
+    }
+    
+    ORDERS {
+        uuid id PK
+        string user_email
+        jsonb items
+        numeric total
+        string status
+        timestamp created_at
+    }
+    
+    FEEDBACK {
+        uuid id PK
+        string user_name
+        string user_email
+        integer rating
+        text message
+        string type
+        timestamp created_at
+    }
+```
+
+
+================================================================================
+                        FEATURES & CAPABILITIES
+================================================================================
+
+1. LIVE DASHBOARD:
+   - Real-time occupancy status (FREE / MODERATE / CROWDED).
+   - Interactive Floor Map (60 tables, color-coded occupancy).
+   - Live Trend Chart (Smooth SVG line graph showing latest 10-min history).
+   - Smart Advice Widget: "GO NOW" (Green) or "WAIT" (Red) based on AI.
+
+2. DIGITAL FOOD ORDERING:
+   - Full-browse menu with 20+ items (Snacks, Meals, Beverages).
+   - 3D Flip Card UI for an engaging menu experience.
+   - Integrated Cart Management with quantity persistent state.
+   - Transactional Receipt Generator (Valid for 2 minutes).
+
+3. SECURE PAYMENTS (UPI):
+   - Dynamic QR Code generation for seamless UPI payments.
+   - Card-Slot Machine visual animation for payment processing.
+   - Order history tracking for student convenience.
+
+4. ADMIN ANALYTICS:
+   - Global Revenue overview.
+   - Sales Mix (Doughnut chart of item categories).
+   - Peak Hour Analysis (Bar chart of occupancy trends).
+   - Menu Management: Add/Delete items instantly via Cloud CRUD.
+
+5. COMMUNITY BUZZ (Feedback):
+   - 5-Star rating system with categorical feedback (Quality, Cleanliness, etc.).
+   - Live scroll of latest student voices.
+
+
+================================================================================
+                         APPLICATION FLOW
+================================================================================
+
+--------------------------------------------------------------------------------
+Student Journey Flowchart (Mermaid):
+--------------------------------------------------------------------------------
+```mermaid
+graph LR
+    Start([Login @upl Email]) --> Dash[Check Live Dashboard]
+    Dash --> Order[Browse Menu & Add to Cart]
+    Order --> Pay[Pay via UPI QR Code]
+    Pay --> Rec[Receive Timer-based Receipt]
+    Rec --> Feed[Submit Feedback]
+    Feed --> Stop([Logout])
+```
+
+--------------------------------------------------------------------------------
+Admin Journey Flowchart (Mermaid):
+--------------------------------------------------------------------------------
+```mermaid
+graph LR
+    Start([Login Admin/Pass]) --> Rev[View Revenue Analytics]
+    Rev --> Menu[Manage Menu Items]
+    Menu --> Monitor[Watch Camera/Status]
+    Monitor --> Stop([Logout])
+```
+
+
+================================================================================
+                        PROJECT STRUCTURE
+================================================================================
+
+root/
+├── App.tsx                  # Main Logic & UI (Largest file)
+├── index.html               # CSS Design System & Shell
+├── apiService.ts            # Data Layer (Supabase + FastAPI)
+│
+├── backend/
+│   ├── server.py            # FastAPI Aggregator
+│   ├── ai_table_smooth.py   # AI Logic for Table Occupancy
+│   └── roboflow_head_counter.py  # AI Logic for Head Counting
+│
+├── services/
+│   └── supabase.ts          # Cloud connection config
+│
+└── public/
+    └── app_logo.jpg         # Branding Asset
+
+
+================================================================================
+                        HOW TO DEPLOY
+================================================================================
+
+1. FRONTEND:
+   - Push to GitHub -> Import to Vercel.
+   - Set Build Command: `npm run build`
+   - Set Environment Variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+
+2. BACKEND:
+   - Run `python server.py` on a cloud VPS (Render/Railway).
+   - Point AI nodes to the deployed URL.
+
+3. AI NODE:
+   - Local PC with Camera access.
+   - Run `python roboflow_head_counter.py`.
+
+
+================================================================================
+               © 2026 • UPL University — BE 8 Project Team
+                        SMART ANNA PROJECT
+================================================================================
