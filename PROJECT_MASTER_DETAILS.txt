@@ -13,12 +13,12 @@ Tagline         : "Swift. Smart. Satisfying."
 Subtitle        : "Intelligence at your service"
 
 DESCRIPTION:
-Smart Anna is a next-generation, AI-powered cafeteria management ecosystem
-that leverages Computer Vision (YOLO) and real-time data aggregation to 
-optimize cafeteria operations. It provides students with live occupancy 
-insights before they arrive, streamlines the food ordering process via 
-digital payments (UPI), and empowers administrators with data-driven 
-revenue and occupancy analytics.
+ Smart Anna is a next-generation, AI-powered cafeteria management ecosystem
+ that leverages Computer Vision (YOLO) and real-time data aggregation to 
+ optimize cafeteria operations. It provides students with live occupancy 
+-insights before they arrive, streamlines the food ordering process via 
+ digital payments (UPI), and empowers administrators with data-driven 
+ revenue and occupancy analytics.
 
 MISSION:
 To eliminate overcrowding, reduce wait times, and digitize the manual 
@@ -55,12 +55,22 @@ Architecture Flowchart (Mermaid):
 --------------------------------------------------------------------------------
 ```mermaid
 graph TD
-    A[CCTV Camera A] -->|Frame| B(AI Node: YOLO)
-    C[CCTV Camera B] -->|Frame| B
-    B -->|POST: /update_people_count| D[FastAPI Backend]
-    D -->|GET: /status| E[React Frontend Dashboard]
-    E -->|Fetch/Post| F[Supabase Cloud DB]
-    F ---|menu_items, orders, feedback| F
+    subgraph Edge_AI_Node
+        A[CCTV Camera A] -->|RTSP Stream| B(AI Node: YOLOv8)
+        C[CCTV Camera B] -->|RTSP Stream| B
+        B -->|Inference| B1[Head Counter]
+    end
+    
+    subgraph Cloud_Services
+        B1 -->|POST: /update_people_count| D[FastAPI Backend]
+        E[React Frontend] -->|Fetch/Post| F[Supabase Cloud DB]
+        D -.->|Memory Sync| E
+    end
+
+    subgraph Student_Mobile
+        E -->|GET: /status| G[Live Dashboard]
+        G -->|Order Flow| E
+    end
 ```
 
 
@@ -141,9 +151,10 @@ erDiagram
     ORDERS {
         uuid id PK
         string user_email
-        jsonb items
+        jsonb items "Array of items"
         numeric total
-        string status
+        string payment_method "UPI/Cash"
+        string status "completed/pending"
         timestamp created_at
     }
     
@@ -151,10 +162,16 @@ erDiagram
         uuid id PK
         string user_name
         string user_email
-        integer rating
+        integer rating "1-5"
         text message
         string type
         timestamp created_at
+    }
+    
+    STUDENTS {
+        string email PK
+        string name
+        string institution
     }
 ```
 
@@ -218,6 +235,108 @@ graph LR
     Menu --> Monitor[Watch Camera/Status]
     Monitor --> Stop([Logout])
 ```
+
+================================================================================
+                        DETAILED WORKFLOWS
+================================================================================
+
+AI DATA PIPELINE (SEQUENCE):
+--------------------------------------------------------------------------------
+```mermaid
+sequenceDiagram
+    participant Cam as CCTV Camera
+    participant AI as YOLO Node
+    participant BE as FastAPI
+    participant FE as React UI
+
+    loop Every 1 Second
+        Cam->>AI: Video Frame
+        AI->>AI: Count Heads (Deep Learning)
+        AI->>BE: POST /update_people_count
+    end
+
+    loop Every 3 Seconds
+        FE->>BE: GET /status
+        BE-->>FE: Return Current Occupancy
+    end
+```
+
+ORDER & PAYMENT LIFECYCLE (STATE):
+--------------------------------------------------------------------------------
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: Logout/Start
+    Idle --> Browsing: Login
+    Browsing --> Cart: Add Items
+    Cart --> Payment: Checkout
+    Payment --> Processing: Scan UPI QR
+    Processing --> Success: Verified
+    Success --> Receipt: Timer Receipt (2m)
+    Receipt --> Idle: Logout
+```
+
+
+================================================================================
+                        PROJECT ROADMAP (GANTT)
+================================================================================
+
+```mermaid
+gantt
+    title Smart Anna Development Phases
+    dateFormat  YYYY-MM-DD
+    section Phase 1: Planning
+    Market Research :2026-01-01, 10d
+    UI/UX Design :2026-01-12, 10d
+    section Phase 2: Logic
+    FastAPI Core :2026-02-01, 15d
+    Supabase Integration :2026-02-15, 10d
+    section Phase 3: AI Node
+    YOLO Model Training :2026-03-01, 20d
+    Multi-Cam Sync :2026-03-20, 10d
+    section Phase 4: Launch
+    Frontend Deployment :2026-04-01, 8d
+    Final Documentation :2026-04-10, 5d
+```
+
+
+================================================================================
+                        VISUAL ANALYTICS & REPORTING
+================================================================================
+The system generates visual representations of cafeteria performance, which can be exported by administrators.
+
+![Analytics Chart](file:///analytics_chart.png)
+*Figure 4: Real-time revenue and occupancy trends.*
+
+![Architecture Visual](file:///architecture_visual.png)
+*Figure 5: High-level system architecture and data flow.*
+
+
+================================================================================
+                        SMART INTELLIGENCE & ANALYTICS
+================================================================================
+The Smart Anna platform has been enhanced with data-driven features to maximize student engagement and operational efficiency.
+
+### 1. Personalized Recommendations
+*   **Logic**: Analyzes a student's last 10 orders to identify their "Preferred Category" (Meals, Snacks, or Beverages).
+*   **Implementation**: A "Curated For You" shelf appears in the Ordering tab, suggesting high-rated items transition from their favorite category.
+*   **Impact**: Simplifies the decision-making process for returning students.
+
+### 2. Advanced Peak-Hour Analytics
+*   **Detection**: Automatically identifies the busiest 1-hour window during the day based on live and historical occupancy trends.
+*   **Optimization**: Provides admin with recommendations for staff allocation (e.g., "Busiest: 12PM - 1PM. Allocating extra staff recommended").
+*   **Unpopular Items**: Identifies products with zero sales to help administrators optimize the menu.
+
+### 3. Dynamic Wait-Time Forecasting
+*   **Trend Tracking**: Calculates whether the cafeteria crowd is "Rising", "Stable", or "Falling" based on pending order queues.
+*   **Advice Engine**: Guides students with actionable advice (e.g., "Wait for 10 mins" or "Perfect time to visit").
+*   **Best Time to Visit**: Smartly predicts the next "Green Zone" (low occupancy) for students to plan their visit.
+
+### 4. Smart Upselling (Combo Engine)
+*   **Logic**: If a student adds a meal but forgets a drink, the "Smart Combo" widget appears in the cart offering a popular beverage.
+*   **Loyalty Score**: A 0-100% score that rewards students based on their order frequency, visible on their dashboard.
+
+---
+*Documentation updated: April 4, 2026*
 
 
 ================================================================================

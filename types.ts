@@ -67,5 +67,14 @@ export interface AnalyticsData {
   top_items: { name: string; rating: number; image?: string; category: string }[];
   revenue_trend: { label: string; value: number }[]; // For Line Chart
   category_split: { label: string; value: number; color: string }[]; // For Pie Chart
-  occupancy_trend: { label: string; value: number }[]; // NEW: For Bar Chart
-}
+  occupancy_trend: { label: string; value: number }[]; // For Bar Chart
+  peak_hours: string; // NEW: e.g., "12PM - 2PM"
+  unpopular_items: { name: string; value: number }[]; // NEW: Items with low sales
+}
+
+export interface SmartInsights {
+  wait_trend: 'RISING' | 'STABLE' | 'FALLING';
+  best_time_to_visit: string;
+  recommended_items: MenuItem[];
+  loyalty_score: number; // 0-100 based on visits
+}

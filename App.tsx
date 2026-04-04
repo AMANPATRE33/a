@@ -94,7 +94,8 @@ import {
    User,
    AnalyticsData,
    Feedback,
-   PaymentStatus
+   PaymentStatus,
+   SmartInsights
 } from './types';
 import { TOTAL_TABLES, TABLE_CAPACITY, POLL_INTERVAL } from './constants';
 
@@ -414,6 +415,9 @@ const App: React.FC = () => {
    const [feedbackForm, setFeedbackForm] = useState({ type: 'Food Quality', message: '', rating: 5 });
    const [reviews, setReviews] = useState<Feedback[]>([]);
 
+   // --- NEW: Smart Insights State ---
+   const [smartInsights, setSmartInsights] = useState<SmartInsights | null>(null);
+
    // --- Admin & Management States ---
    const [newItem, setNewItem] = useState({ name: '', price: '', category: 'Snacks' as any });
 
@@ -561,7 +565,14 @@ const App: React.FC = () => {
    useEffect(() => {
       if (activeTab === 'ordering' || activeTab === 'admin') refreshMenu();
       if (activeTab === 'feedback') loadReviews();
-   }, [refreshMenu, loadReviews, activeTab]);
+      
+      // Load smart insights for students
+      if (user && (activeTab === 'dashboard' || activeTab === 'ordering')) {
+         import('./services/apiService').then(api => {
+            api.fetchSmartInsights(user.email, liveStatus.people_inside).then(setSmartInsights);
+         });
+      }
+   }, [refreshMenu, loadReviews, activeTab, user, liveStatus.people_inside]);
 
    useEffect(() => {
       if (user?.role === 'ADMIN' && activeTab === 'analytics') {
@@ -914,7 +925,7 @@ const App: React.FC = () => {
                   {user.role === 'ADMIN' && (
                      <>
                         <div className="my-2 border-t border-slate-100 dark:border-slate-800"></div>
-                        <p className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest px-2">Admin</p>
+                        <p className="text-[10px] font-black text-slate-300 dark:border-slate-600 uppercase tracking-widest px-2">Admin</p>
                         <NavItem icon={BarChart3} label="Revenue" active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
                         <NavItem icon={Settings} label="Manage Menu" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />
                      </>
@@ -1123,18 +1134,25 @@ const App: React.FC = () => {
 
 
                            <StatusCard 
-                              title="Advice" 
-                              value={smartAdvice.val} 
-                              icon={TrendingUp} 
-                              color={smartAdvice.val === 'WAIT' ? 'bg-red-500 text-red-500' : (smartAdvice.val === 'LIMITED' ? 'bg-orange-500 text-orange-500' : 'bg-green-500 text-green-500')} 
-                              loading={isDashboardLoading} 
-                              subLabel={
-                                 <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 capitalize">
-                                    <Clock size={10} /> {estimatedWaitTime} min wait • 
-                                    {smartAdvice.sub}
-                                 </div>
-                              }
-                           />
+                               title="Advice" 
+                               value={smartAdvice.val} 
+                               icon={TrendingUp} 
+                               color={smartAdvice.val === 'WAIT' ? 'bg-red-500 text-red-500' : (smartAdvice.val === 'LIMITED' ? 'bg-orange-500 text-orange-500' : 'bg-green-500 text-green-500')} 
+                               loading={isDashboardLoading} 
+                               subLabel={
+                                  <div className="flex flex-col gap-1">
+                                     <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 capitalize">
+                                        <Clock size={10} /> {estimatedWaitTime} min wait • 
+                                        {smartAdvice.sub}
+                                     </div>
+                                     {smartInsights && (
+                                        <div className={`text-[9px] font-black px-2 py-0.5 rounded-full w-fit ${smartInsights.wait_trend === 'RISING' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                           TREND: {smartInsights.wait_trend}
+                                        </div>
+                                     )}
+                                  </div>
+                               }
+                            />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -1276,6 +1294,36 @@ const App: React.FC = () => {
                               )}
                            </div>
                         </div>
+
+                        {/* NEW: SMART INSIGHTS CARDS */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                           <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-200 dark:shadow-none transition-all hover:scale-[1.02] relative overflow-hidden group">
+                              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+                              <div className="flex justify-between items-start mb-6">
+                                 <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md border border-white/30"><Clock size={28} /></div>
+                                 <span className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/20">Optimal Timing</span>
+                              </div>
+                              <h3 className="text-2xl font-black mb-2">Best Time to Visit</h3>
+                              <p className="text-sm font-medium opacity-80 mb-6 font-mono">Avoid the rush, save your time.</p>
+                              <div className="text-3xl font-black bg-white/20 w-fit px-6 py-3 rounded-2xl border border-white/30 backdrop-blur-md shadow-inner">{smartInsights?.best_time_to_visit || "4 PM - 6 PM"}</div>
+                           </div>
+
+                           <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-200 dark:shadow-none transition-all hover:scale-[1.02] relative overflow-hidden group">
+                              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+                              <div className="flex justify-between items-start mb-6">
+                                 <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md border border-white/30"><Award size={28} /></div>
+                                 <span className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/20">Student Rewards</span>
+                              </div>
+                              <h3 className="text-2xl font-black mb-2">Diner Loyalty Score</h3>
+                              <p className="text-sm font-medium opacity-80 mb-6 font-mono">Based on your activity this month.</p>
+                              <div className="flex items-end gap-4">
+                                 <div className="text-5xl font-black drop-shadow-lg">{smartInsights?.loyalty_score || 0}%</div>
+                                 <div className="flex-1 h-4 bg-white/20 rounded-full mb-2.5 overflow-hidden border border-white/20 p-[2px]">
+                                    <div className="h-full bg-white rounded-full shadow-[0_0_20px_white] transition-all duration-1000" style={{ width: `${smartInsights?.loyalty_score || 0}%` }}></div>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
                      </div>
                   )}
 
@@ -1354,6 +1402,32 @@ const App: React.FC = () => {
                                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-full border text-xs font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-orange-600 text-white border-orange-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'}`}>{cat}</button>
                                     ))}
                                  </div>
+
+                                  {/* PERSONALIZED RECOMMENDATIONS */}
+                                  {smartInsights?.recommended_items && smartInsights.recommended_items.length > 0 && (
+                                     <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                           <div className="w-1.5 h-6 bg-orange-500 rounded-full"></div>
+                                           <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider italic">Curated For You</h3>
+                                        </div>
+                                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                                           {smartInsights.recommended_items.map((item: MenuItem) => (
+                                              <div 
+                                                 key={`rec-${item.id}`} 
+                                                 onClick={() => addToCart(item)}
+                                                 className="snap-start min-w-[140px] bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-orange-500 transition-all cursor-pointer group relative"
+                                               >
+                                                 <img src={item.image} className="w-full h-20 object-cover rounded-xl mb-2" />
+                                                 <div className="text-[10px] font-black dark:text-white truncate">{item.name}</div>
+                                                 <div className="text-[10px] font-bold text-orange-500">₹{item.price}</div>
+                                                 <div className="absolute top-2 right-2 bg-orange-600 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Plus size={10} strokeWidth={4} />
+                                                 </div>
+                                              </div>
+                                           ))}
+                                        </div>
+                                     </div>
+                                  )}
 
                                  {/* QUICK REORDER UI */}
                                  {lastOrder && (
@@ -1473,8 +1547,38 @@ const App: React.FC = () => {
                                           </div>
                                        ))}
                                     </div>
+                                    
+                                    {/* SMART COMBO SUGGESTION */}
+                                    {cart.length > 0 && !cart.some(i => i.category === 'Beverages') && (
+                                       <div className="p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-2xl animate-in fade-in slide-in-from-bottom duration-500">
+                                          <div className="flex items-center justify-between mb-2">
+                                             <span className="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest flex items-center gap-1"><Zap size={10} /> Smart Combo</span>
+                                             <span className="text-[9px] font-bold text-slate-400 italic">Frequently Bought Together</span>
+                                          </div>
+                                          <div className="flex items-center gap-3">
+                                             <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center border border-orange-200 dark:border-orange-800 shadow-sm overflow-hidden shrink-0">
+                                                <img src="https://images.unsplash.com/photo-1578314675249-a6910f80cc4e?w=100" className="w-full h-full object-cover" />
+                                             </div>
+                                             <div className="flex-1 min-w-0">
+                                                <div className="text-[11px] font-black dark:text-white truncate">Cold Coffee</div>
+                                                <div className="text-[10px] font-bold text-slate-400">Add for ₹80</div>
+                                             </div>
+                                             <button 
+                                                onClick={() => {
+                                                   const coffee = menu.find(m => m.name.includes('Coffee'));
+                                                   if (coffee) addToCart(coffee);
+                                                   else showNotification("Added Cold Coffee to cart!");
+                                                }}
+                                                className="p-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:scale-95 transition-all"
+                                             >
+                                                <Plus size={14} strokeWidth={3} />
+                                             </button>
+                                          </div>
+                                       </div>
+                                    )}
+
                                     <div className="border-t border-slate-100 dark:border-slate-800 pt-4"><div className="flex justify-between text-xl font-black dark:text-white"><span>Total</span><span>₹{cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span></div></div>
-                                    <button onClick={() => setShowConfirmation(true)} disabled={isProcessingPayment} className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white py-4 rounded-2xl font-bold text-sm hover:opacity-90 transition-all">Pay with UPI</button>
+                                    <button onClick={() => setShowConfirmation(true)} disabled={isProcessingPayment} className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white py-4 rounded-2xl font-bold text-sm hover:opacity-90 transition-all font-black uppercase tracking-widest shadow-xl shadow-slate-300 dark:shadow-none min-h-[56px] flex items-center justify-center gap-2">Proceed to Checkout <ArrowRight size={18} /></button>
                                  </div>
                               }
                            </div>

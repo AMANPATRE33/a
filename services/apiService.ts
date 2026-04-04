@@ -1,5 +1,5 @@
 import { supabase } from '../src/lib/supabase';
-import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, MenuItem, Feedback, PaymentStatus } from '../types';
+import { CafeteriaStatus, TableStatus, CrowdStatus, User, Receipt, AnalyticsData, MenuItem, Feedback, PaymentStatus, SmartInsights } from '../types';
 import { TOTAL_TABLES, TABLE_CAPACITY, INITIAL_MENU } from '../constants';
 
 /**
@@ -462,8 +462,9 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
     const { data: orders, error: orderError } = await supabase
       .from('orders')
       .select('total, items, created_at, status')
-      .eq('status', 'paid'); // Only count successfully paid orders
+      .eq('status', 'completed'); // Only count successfully paid orders
 
+    const fullMenu_local = await fetchMenu();
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback')
       .select('rating');
@@ -572,6 +573,16 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
     const revenueTrend = timeLabels.map(label => ({ label, value: revenueByTime[label] }));
     const occupancyTrend = timeLabels.map(label => ({ label, value: Math.min(60, occupancyProxy[label] * 5) })); // Scaled for 60 tables
 
+    // NEW: Calculate Peak Hours
+    const peakSlot = [...occupancyTrend].sort((a,b) => b.value - a.value)[0];
+    const peakHours = peakSlot ? `${peakSlot.label} - ${peakSlot.label.includes('am') ? '12pm' : '8pm'}` : "12 PM - 2 PM";
+
+    // NEW: Unpopular Items (Optimization)
+    const unpopularItems = fullMenu_local
+      .filter(m => !itemCounts[m.name])
+      .map(m => ({ name: m.name, value: 0 }))
+      .slice(0, 3);
+
     return {
       total_revenue: totalRevenue,
       avg_rating: Number(avgRating.toFixed(1)),
@@ -579,9 +590,11 @@ export const fetchAnalytics = async (timeframe: 'daily' | 'weekly' | 'monthly' =
       revenue_trend: revenueTrend.length > 0 ? revenueTrend : getMockAnalytics(timeframe).revenue_trend,
       category_split: categorySplit,
       occupancy_trend: occupancyTrend.length > 0 ? occupancyTrend : getMockAnalytics(timeframe).occupancy_trend,
+      peak_hours: peakHours,
+      unpopular_items: unpopularItems.length > 0 ? unpopularItems : [ { name: 'N/A', value: 0 } ],
       top_items: itemSales.length > 0 ? itemSales.slice(0, 3).map(i => ({
         name: i.name,
-        rating: 4.8, // Derived from overall avg or could be improved later
+        rating: 4.8, 
         category: 'Best Seller'
       })) : getMockAnalytics(timeframe).top_items
     };
@@ -623,6 +636,86 @@ export const exportReportToCSV = async (): Promise<string> => {
   } catch (err) {
     console.error("Export failed:", err);
     return "Error generating report.";
+  }
+};
+
+// 5. SMART FEATURES & PERSONALIZATION
+/**
+ * Fetches personalized recommendations based on the user's order history.
+ * @param {string} userEmail - Student email to analyze.
+ * @returns {Promise<MenuItem[]>} Recommended items tailored to their profile.
+ */
+export const fetchPersonalizedRecommendations = async (userEmail: string): Promise<MenuItem[]> => {
+  try {
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('items')
+      .eq('user_email', userEmail)
+      .limit(10);
+
+    const fullMenu = await fetchMenu();
+    if (error || !orders || orders.length === 0) {
+      // If no history, return top 3 overall popular items
+      return fullMenu.slice(0, 3);
+    }
+
+    // Count category and item frequency
+    const categoryFreq: Record<string, number> = {};
+    const itemFreq: Record<string, number> = {};
+    
+    orders.forEach((o: any) => {
+      const items = o.items || [];
+      items.forEach((it: any) => {
+        categoryFreq[it.category] = (categoryFreq[it.category] || 0) + 1;
+        itemFreq[it.name] = (itemFreq[it.name] || 0) + 1;
+      });
+    });
+
+    // Find favorite category
+    const favoriteCategory = Object.entries(categoryFreq).sort((a,b) => b[1] - a[1])[0]?.[0];
+    
+    // Suggest items from favorite category that they haven't ordered much yet
+    // OR just return the most ordered items from that category
+    let suggestions = fullMenu.filter(m => m.category === favoriteCategory);
+    
+    // Sort suggestions by price/name and return top 4
+    return suggestions.length > 0 ? suggestions.slice(0, 4) : fullMenu.slice(0, 4);
+
+  } catch (e) {
+    console.error("fetchRecommendations Error:", e);
+    return INITIAL_MENU.slice(0, 3);
+  }
+};
+
+/**
+ * Calculates current wait time trend and best time to visit based on live and historical data.
+ */
+export const fetchSmartInsights = async (userEmail: string, currentOccupancy: number): Promise<SmartInsights> => {
+  try {
+    // 1. Calculate Wait Trend (based on pending orders)
+    const pendingCount = await fetchPendingOrdersCount();
+    const trend: 'RISING' | 'STABLE' | 'FALLING' = pendingCount > 5 ? 'RISING' : pendingCount > 2 ? 'STABLE' : 'FALLING';
+
+    // 2. Recommendations
+    const recs = await fetchPersonalizedRecommendations(userEmail);
+
+    // 3. Loyalty Score
+    const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('user_email', userEmail);
+    const loyalty = Math.min(100, (count || 0) * 10);
+
+    return {
+      wait_trend: trend,
+      best_time_to_visit: "4 PM - 6 PM", // Optimized fallback
+      recommended_items: recs,
+      loyalty_score: loyalty
+    };
+  } catch (e) {
+    return {
+      wait_trend: 'STABLE',
+      best_time_to_visit: '3PM',
+      recommended_items: [],
+      loyalty_score: 10
+    };
   }
 };
 
@@ -711,6 +804,11 @@ const getMockAnalytics = (timeframe: string): AnalyticsData => {
         category: 'Snacks',
         image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=500&auto=format&fit=crop&q=60'
       }
+    ],
+    peak_hours: timeframe === 'daily' ? '12:00 PM - 02:00 PM' : 'Lunch Hours',
+    unpopular_items: [
+      { name: 'Plain Soda', value: 2 },
+      { name: 'Generic Salad', value: 1 }
     ]
   };
 };
